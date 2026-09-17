@@ -455,6 +455,17 @@ func goschedIfBusy() {
 //
 //go:linkname gopark
 func gopark(unlockf func(*g, unsafe.Pointer) bool, lock unsafe.Pointer, reason waitReason, traceReason traceBlockReason, traceskip int) {
+	if b := getg().bubble; b != nil && b.deterministic != nil {
+		if b.deterministic.randomActive && reason.isIdleInSynctest() {
+			fatal("runtime/bubble: random source must not block")
+		}
+		if b.deterministic.delivering && reason.isIdleInSynctest() {
+			fatal("runtime/bubble: delivery callback must not block")
+		}
+		if reason.isMutexWait() || reason == waitReasonSyncWaitGroupWait || reason == waitReasonIOWait {
+			fatal("runtime/bubble: unsupported external blocking operation")
+		}
+	}
 	if reason != waitReasonSleep {
 		checkTimeouts() // timeouts may expire while two goroutines keep the scheduler busy
 	}
@@ -1147,8 +1158,10 @@ func ready(gp *g, traceskip int, next bool) {
 		trace.GoUnpark(gp, traceskip)
 		traceRelease(trace)
 	}
-	runqput(mp.p.ptr(), gp, next)
-	wakep()
+	if gp.bubble == nil || !deterministicEnqueue(gp) {
+		runqput(mp.p.ptr(), gp, next)
+		wakep()
+	}
 	releasem(mp)
 }
 
@@ -3346,6 +3359,14 @@ func gcstopm() {
 //go:yeswritebarrierrec
 func execute(gp *g, inheritTime bool) {
 	mp := getg().m
+	if b := gp.bubble; b != nil && b.deterministic != nil && b.deterministic.owner.Load() != uintptr(unsafe.Pointer(gp)) {
+		throw("runtime/bubble: scheduled a non-owner")
+	}
+	if raceenabled && gp.bubble != nil && gp.bubble.deterministic != nil {
+		// Publish host inputs without synchronizing unrelated user goroutines
+		// merely because this scheduling policy runs them one at a time.
+		raceacquireg(gp, unsafe.Pointer(&gp.bubble.deterministic.activation))
+	}
 
 	if goroutineProfile.active {
 		// Make sure that gp has had its stack written out to the goroutine
@@ -4314,6 +4335,9 @@ func park_m(gp *g) {
 	}
 
 	if bubble != nil {
+		if bubble.deterministic != nil && gp.waitreason.isIdleInSynctest() {
+			deterministicRelease(gp, false)
+		}
 		bubble.decActive()
 	}
 
@@ -4321,6 +4345,12 @@ func park_m(gp *g) {
 }
 
 func goschedImpl(gp *g, preempted bool) {
+	if b := gp.bubble; b != nil && b.deterministic != nil && b.deterministic.randomActive && !preempted {
+		fatal("runtime/bubble: random source must not yield")
+	}
+	if b := gp.bubble; b != nil && b.deterministic != nil && b.deterministic.delivering && !preempted {
+		fatal("runtime/bubble: delivery callback must not yield")
+	}
 	pp := gp.m.p.ptr()
 	trace := traceAcquire()
 	status := readgstatus(gp)
@@ -4344,6 +4374,10 @@ func goschedImpl(gp *g, preempted bool) {
 	}
 
 	dropg()
+	if b := gp.bubble; b != nil && b.deterministic != nil && !preempted {
+		deterministicRelease(gp, true)
+		schedule()
+	}
 	if preempted && sched.gcwaiting.Load() {
 		// If preempted for STW, keep the G on the local P in runnext
 		// so it can keep running immediately after the STW.
@@ -4371,7 +4405,8 @@ func goschedguarded_m(gp *g) {
 	if !canPreemptM(gp.m) {
 		gogo(&gp.sched) // never return
 	}
-	goschedImpl(gp, false)
+	// Allocator-requested preemption is not an explicit user yield.
+	goschedImpl(gp, gp.bubble != nil && gp.bubble.deterministic != nil)
 }
 
 func gopreempt_m(gp *g) {
@@ -4512,7 +4547,15 @@ func goexit0(gp *g) {
 		// Since this is running on g0, our registers are already zeroed from going through
 		// mcall in secret mode.
 	}
+	bubble := gp.bubble
+	if bubble != nil && bubble.deterministic != nil {
+		bubble.incActive()
+		deterministicRelease(gp, false)
+	}
 	gdestroy(gp)
+	if bubble != nil && bubble.deterministic != nil {
+		bubble.decActive()
+	}
 	schedule()
 }
 
@@ -4642,6 +4685,9 @@ func save(pc, sp, bp uintptr) {
 //go:nosplit
 func reentersyscall(pc, sp, bp uintptr) {
 	gp := getg()
+	if gp.bubble != nil && gp.bubble.deterministic != nil {
+		systemstack(func() { fatal("runtime/bubble: syscalls are not supported") })
+	}
 
 	// Disable preemption because during this function g is in Gsyscall status,
 	// but can have inconsistent g->sched, do not let GC observe it.
@@ -4829,6 +4875,9 @@ func entersyscallHandleGCWait(trace traceLocker) {
 //go:linkname entersyscallblock
 //go:nosplit
 func entersyscallblock() {
+	if b := getg().bubble; b != nil && b.deterministic != nil {
+		systemstack(func() { fatal("runtime/bubble: syscalls are not supported") })
+	}
 	gp := getg()
 
 	gp.m.locks++ // see comment in entersyscall
@@ -5334,11 +5383,17 @@ func malg(stacksize int32) *g {
 // The compiler turns a go statement into a call to this.
 func newproc(fn *funcval) {
 	gp := getg()
+	if gp.bubble != nil && gp.bubble.deterministic != nil && gp.bubble.deterministic.randomActive {
+		panic("runtime/bubble: random source must not start goroutines")
+	}
 	pc := sys.GetCallerPC()
 	systemstack(func() {
 		newg := newproc1(fn, gp, pc, false, waitReasonZero)
 
 		pp := getg().m.p.ptr()
+		if newg.bubble != nil && deterministicEnqueue(newg) {
+			return
+		}
 		runqput(pp, newg, true)
 
 		if mainStarted {
@@ -5673,6 +5728,9 @@ func dolockOSThread() {
 //
 //go:nosplit
 func LockOSThread() {
+	if b := getg().bubble; b != nil && b.deterministic != nil {
+		panic(errorString("runtime/bubble: LockOSThread is not supported"))
+	}
 	if atomic.Load(&newmHandoff.haveTemplateThread) == 0 && GOOS != "plan9" {
 		// If we need to start a new thread from the locked
 		// thread, we need the template thread. Start it now

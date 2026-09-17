@@ -182,6 +182,9 @@ func chansend(c *hchan, ep unsafe.Pointer, block bool, callerpc uintptr) bool {
 		racereadpc(c.raceaddr(), callerpc, abi.FuncPCABIInternal(chansend))
 	}
 
+	if getg().bubble != nil {
+		deterministicCheckChan(c)
+	}
 	if c.bubble != nil && getg().bubble != c.bubble {
 		fatal("send on synctest channel from outside bubble")
 	}
@@ -407,6 +410,9 @@ func closechan(c *hchan) {
 	if c == nil {
 		panic(plainError("close of nil channel"))
 	}
+	if getg().bubble != nil {
+		deterministicCheckChan(c)
+	}
 	if c.bubble != nil && getg().bubble != c.bubble {
 		fatal("close of synctest channel from outside bubble")
 	}
@@ -469,6 +475,16 @@ func closechan(c *hchan) {
 	}
 	unlock(&c.lock)
 
+	if c.bubble != nil && c.bubble.deterministic != nil {
+		// glist is a stack, but this policy wakes receivers in registration
+		// order, followed by senders in registration order.
+		var ordered gList
+		for !glist.empty() {
+			ordered.push(glist.pop())
+		}
+		glist = ordered
+	}
+
 	// Ready all Gs now that we've dropped the channel lock.
 	for !glist.empty() {
 		gp := glist.pop()
@@ -529,6 +545,9 @@ func chanrecv(c *hchan, ep unsafe.Pointer, block bool) (selected, received bool)
 		throw("unreachable")
 	}
 
+	if getg().bubble != nil {
+		deterministicCheckChan(c)
+	}
 	if c.bubble != nil && getg().bubble != c.bubble {
 		fatal("receive on synctest channel from outside bubble")
 	}
@@ -808,6 +827,9 @@ func reflect_chanrecv(c *hchan, nb bool, elem unsafe.Pointer) (selected bool, re
 }
 
 func chanlen(c *hchan) int {
+	if getg().bubble != nil {
+		deterministicCheckChan(c)
+	}
 	if c == nil || c.timer != nil {
 		// timer channels have a buffered implementation
 		// but present to users as unbuffered, so that we can
@@ -818,6 +840,9 @@ func chanlen(c *hchan) int {
 }
 
 func chancap(c *hchan) int {
+	if getg().bubble != nil {
+		deterministicCheckChan(c)
+	}
 	if c == nil || c.timer != nil {
 		// timer channels have a buffered implementation
 		// but present to users as unbuffered, so that we can

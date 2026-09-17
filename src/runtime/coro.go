@@ -40,6 +40,9 @@ type coro struct {
 // goroutine blocked waiting to run f
 // and returns that coro.
 func newcoro(f func(*coro)) *coro {
+	if b := getg().bubble; b != nil && b.deterministic != nil {
+		panic(errorString("runtime/bubble: coroutine transfers are not supported"))
+	}
 	c := new(coro)
 	c.f = f
 	pc := sys.GetCallerPC()
@@ -90,6 +93,9 @@ func coroexit(c *coro) {
 // and then blocks the current goroutine on c.
 func coroswitch(c *coro) {
 	gp := getg()
+	if gp.bubble != nil && gp.bubble.deterministic != nil {
+		panic(errorString("runtime/bubble: coroutine transfers are not supported"))
+	}
 	gp.coroarg = c
 	mcall(coroswitch_m)
 }

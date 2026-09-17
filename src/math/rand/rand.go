@@ -11,6 +11,9 @@
 //
 // Top-level functions, such as [Float64] and [Int],
 // are safe for concurrent use by multiple goroutines.
+// Inside this fork's experimental runtime/bubble, top-level functions use the
+// bubble's configured application random source and a bubble-local Read buffer.
+// Generators constructed with New continue to use their explicit sources.
 //
 // This package's outputs might be easily predictable regardless of how it's
 // seeded. For random numbers suitable for security-sensitive work, see the
@@ -19,6 +22,7 @@ package rand
 
 import (
 	"internal/godebug"
+	runtimebubble "internal/runtime/bubble"
 	"sync"
 	"sync/atomic"
 	_ "unsafe" // for go:linkname
@@ -275,6 +279,8 @@ func (r *Rand) Read(p []byte) (n int, err error) {
 		return src.read(p, &r.readVal, &r.readPos)
 	case *runtimeSource:
 		return src.read(p, &r.readVal, &r.readPos)
+	case *bubbleSource:
+		return src.read(p, &r.readVal, &r.readPos)
 	}
 	return read(p, r.src, &r.readVal, &r.readPos)
 }
@@ -319,6 +325,9 @@ var randseednop = godebug.New("randseednop")
 // globalRand returns the generator to use for the top-level convenience
 // functions.
 func globalRand() *Rand {
+	if r := runtimebubble.LegacyRand(newBubbleRand); r != nil {
+		return r.(*Rand)
+	}
 	if r := globalRandGenerator.Load(); r != nil {
 		return r
 	}
@@ -397,7 +406,14 @@ func (fs *runtimeSource) read(p []byte, readVal *int64, readPos *int8) (n int, e
 //
 // As of Go 1.24 [Seed] is a no-op. To restore the previous behavior set
 // GODEBUG=randseednop=0.
+// Inside runtime/bubble, Seed is always a no-op; the bubble's Options select its
+// source independently of the process-wide generator and GODEBUG settings.
 func Seed(seed int64) {
+	// Bubble configuration owns its source. Legacy global seeding is a no-op
+	// here, independent of GODEBUG, and must not alter the host's generator.
+	if runtimebubble.LegacyRand(newBubbleRand) != nil {
+		return
+	}
 	if randseednop.Value() != "0" {
 		return
 	}

@@ -680,6 +680,12 @@ func deferreturn() {
 //
 // It crashes if called from a thread not created by the Go runtime.
 func Goexit() {
+	if b := getg().bubble; b != nil && b.deterministic != nil && b.deterministic.randomActive {
+		panic("runtime/bubble: random source must return")
+	}
+	if b := getg().bubble; b != nil && b.deterministic != nil && b.deterministic.delivering {
+		panic(errorString("runtime/bubble: delivery callback must return"))
+	}
 	// Create a panic object for Goexit, so we can recognize when it might be
 	// bypassed by a recover().
 	var p _panic

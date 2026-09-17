@@ -57,6 +57,7 @@ var depsRules = `
 	  internal/nettrace,
 	  internal/platform,
 	  internal/profilerecord,
+	  internal/runtime/bubble,
 	  internal/runtime/pprof/label,
 	  internal/simd/variants,
 	  internal/syslist,
@@ -85,6 +86,7 @@ var depsRules = `
 	internal/goexperiment,
 	internal/goos,
 	internal/profilerecord,
+	internal/runtime/bubble,
 	internal/runtime/pprof/label,
 	internal/strconv,
 	internal/trace/tracev2,
@@ -774,6 +776,9 @@ var depsRules = `
 
 	internal/synctest, testing
 	< testing/synctest;
+
+	FMT, internal/runtime/bubble, math/rand/v2
+	< runtime/bubble;
 
 	testing
 	< internal/testhash;

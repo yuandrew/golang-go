@@ -176,6 +176,9 @@ func selectgo(cas0 *scase, order0 *uint16, pc0 *uintptr, nsends, nrecvs int, blo
 			continue
 		}
 
+		if gp.bubble != nil {
+			deterministicCheckChan(cas.c)
+		}
 		if cas.c.bubble != nil {
 			if getg().bubble != cas.c.bubble {
 				fatal("select on synctest channel from outside bubble")
@@ -188,7 +191,12 @@ func selectgo(cas0 *scase, order0 *uint16, pc0 *uintptr, nsends, nrecvs int, blo
 			cas.c.timer.maybeRunChan(cas.c)
 		}
 
-		j := cheaprandn(uint32(norder + 1))
+		var j uint32
+		if gp.bubble != nil && gp.bubble.deterministic != nil {
+			j = gp.bubble.deterministicSelect(uint32(norder + 1))
+		} else {
+			j = cheaprandn(uint32(norder + 1))
+		}
 		pollorder[norder] = pollorder[j]
 		pollorder[j] = uint16(i)
 		norder++
