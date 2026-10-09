@@ -242,9 +242,6 @@ func TestQuiescenceClockAndDelivery(t *testing.T) {
 	if s.Status != bubble.Quiescent || s.RootDone || s.LiveGoroutines != 1 {
 		t.Fatalf("quiescent state: %+v", s)
 	}
-	if err := b.Close(); err == nil {
-		t.Fatal("Close accepted a live goroutine")
-	}
 	if trace := b.StackTrace(); !strings.Contains(trace, "chan receive") {
 		t.Errorf("missing channel wait stack: %s", trace)
 	}
@@ -669,7 +666,7 @@ func (p deliveryPanicStringer) String() string {
 	return "user formatter executed outside bubble"
 }
 
-// Faulted bubbles retain live goroutines. Use a subprocess until disposal exists.
+// A subprocess also exercises fatal unsupported delivery operations.
 func TestDeliveryFault(t *testing.T) {
 	if scenario := os.Getenv("GO_BUBBLE_DELIVERY_FAULT"); scenario != "" {
 		var timer *time.Timer
@@ -719,8 +716,11 @@ func TestDeliveryFault(t *testing.T) {
 		if _, err := b.Step(bubble.Activation{Deliver: func(*bubble.Delivery) { called = true }}); err == nil || called {
 			t.Fatal("faulted bubble resumed")
 		}
-		if err := b.Close(); err == nil {
-			t.Fatal("faulted live bubble closed")
+		if err := b.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if resumed {
+			t.Fatal("fault disposal resumed user code")
 		}
 		return
 	}
@@ -760,8 +760,6 @@ func TestUnsupportedOperations(t *testing.T) {
 			case "host-receive":
 				owned = make(chan int, 1)
 				owned <- 42
-			case "afterfunc":
-				time.AfterFunc(time.Hour, func() {})
 			case "ticker":
 				time.NewTicker(time.Hour)
 			}
@@ -787,7 +785,7 @@ func TestUnsupportedOperations(t *testing.T) {
 		}
 		return
 	}
-	for _, scenario := range []string{"external-send", "external-select", "external-reflect-select", "external-close", "external-closed-receive", "host-receive", "afterfunc", "ticker", "delivery-yield", "delivery-block"} {
+	for _, scenario := range []string{"external-send", "external-select", "external-reflect-select", "external-close", "external-closed-receive", "host-receive", "ticker", "delivery-yield", "delivery-block"} {
 		t.Run(scenario, func(t *testing.T) {
 			cmd := exec.Command(os.Args[0], "-test.run=^TestUnsupportedOperations$", "-test.timeout=10s")
 			cmd.Env = append(os.Environ(), "GO_BUBBLE_UNSUPPORTED="+scenario)

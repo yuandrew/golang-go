@@ -67,13 +67,28 @@ type timer struct {
 	isChan bool         // timer has a channel; immutable; can be read without lock
 	isFake bool         // timer is using fake time; immutable; can be read without lock
 
+	// Pack scalar fields before pointers to avoid an ordinary allocation increase.
+	blocked uint32 // number of goroutines blocked on timer's channel
+	rand    uint32 // randomizes order of timers at same instant; only set when isFake
+
+	// isSending is used to handle races between running a
+	// channel timer and stopping or resetting the timer.
+	// It is used only for channel timers (t.isChan == true).
+	// It is not used for tickers.
+	// The value is incremented when about to send a value on the channel,
+	// and decremented after sending the value.
+	// The stop/reset code uses this to detect whether it
+	// stopped the channel send.
+	//
+	// isSending is incremented only when t.mu is held.
+	// isSending is decremented only when t.sendLock is held.
+	// isSending is read only when both t.mu and t.sendLock are held.
+	isSending atomic.Int32
+
 	// Host-controlled timers never enter a timer heap. This immutable pointer
 	// is nil for ordinary timers; registration metadata is allocated only for
 	// timers belonging to deterministic bubbles.
 	deterministic *deterministicTimer
-
-	blocked uint32 // number of goroutines blocked on timer's channel
-	rand    uint32 // randomizes order of timers at same instant; only set when isFake
 
 	// Timer wakes up at when, and then at when+period, ... (period > 0 only)
 	// each time calling f(arg, seq, delay) in the timer goroutine, so f must be
@@ -111,20 +126,6 @@ type timer struct {
 
 	// sendLock protects sends on the timer's channel.
 	sendLock mutex
-
-	// isSending is used to handle races between running a
-	// channel timer and stopping or resetting the timer.
-	// It is used only for channel timers (t.isChan == true).
-	// It is not used for tickers.
-	// The value is incremented when about to send a value on the channel,
-	// and decremented after sending the value.
-	// The stop/reset code uses this to detect whether it
-	// stopped the channel send.
-	//
-	// isSending is incremented only when t.mu is held.
-	// isSending is decremented only when t.sendLock is held.
-	// isSending is read only when both t.mu and t.sendLock are held.
-	isSending atomic.Int32
 }
 
 // init initializes a newly allocated timer t.
@@ -403,11 +404,6 @@ type timeTimer struct {
 //
 //go:linkname newTimer time.newTimer
 func newTimer(when, period int64, f func(arg any, seq uintptr, delay int64), arg any, c *hchan) *timeTimer {
-	if b := getg().bubble; b != nil && b.deterministic != nil {
-		if period != 0 || c == nil {
-			panic(errorString("runtime/bubble: Ticker and AfterFunc are unsupported"))
-		}
-	}
 	t := new(timeTimer)
 	t.timer.init(nil, nil)
 	t.trace("new")
@@ -425,6 +421,9 @@ func newTimer(when, period int64, f func(arg any, seq uintptr, delay int64), arg
 	if bubble := getg().bubble; bubble != nil {
 		t.isFake = true
 		if bubble.deterministic != nil {
+			if period != 0 {
+				panic(errorString("runtime/bubble: Ticker is unsupported"))
+			}
 			t.deterministicRegister(bubble)
 		}
 	}

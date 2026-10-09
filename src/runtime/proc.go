@@ -455,16 +455,8 @@ func goschedIfBusy() {
 //
 //go:linkname gopark
 func gopark(unlockf func(*g, unsafe.Pointer) bool, lock unsafe.Pointer, reason waitReason, traceReason traceBlockReason, traceskip int) {
-	if b := getg().bubble; b != nil && b.deterministic != nil {
-		if b.deterministic.randomActive && reason.isIdleInSynctest() {
-			fatal("runtime/bubble: random source must not block")
-		}
-		if b.deterministic.delivering && reason.isIdleInSynctest() {
-			fatal("runtime/bubble: delivery callback must not block")
-		}
-		if reason.isMutexWait() || reason == waitReasonSyncWaitGroupWait || reason == waitReasonIOWait {
-			fatal("runtime/bubble: unsupported external blocking operation")
-		}
+	if gp := getg(); gp.bubble != nil {
+		bubblePark(gp, reason)
 	}
 	if reason != waitReasonSleep {
 		checkTimeouts() // timeouts may expire while two goroutines keep the scheduler busy
@@ -4555,6 +4547,7 @@ func goexit0(gp *g) {
 	gdestroy(gp)
 	if bubble != nil && bubble.deterministic != nil {
 		bubble.decActive()
+		bubble.deterministicFaultWake()
 	}
 	schedule()
 }

@@ -15,6 +15,7 @@ type TimerChange struct {
 }
 
 type State struct {
+	Failure        string
 	RootDone       bool
 	LiveGoroutines int
 	TimerChanges   []TimerChange
@@ -47,6 +48,9 @@ func Close(handle any) bool
 
 //go:linkname FireTimer
 func FireTimer(handle any, id, generation uint64) bool
+
+//go:linkname RetireTimerRange
+func RetireTimerRange(handle any, first, last uint64)
 
 //go:linkname StackTrace
 func StackTrace(handle any) string

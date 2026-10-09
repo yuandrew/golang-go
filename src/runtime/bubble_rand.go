@@ -11,13 +11,31 @@ import "unsafe"
 // runtime internals must not consume application state or call arbitrary Go.
 // This function runs on the requesting user goroutine without runtime locks.
 //
+//go:nosplit
 //go:linkname deterministicRandom internal/runtime/bubble.Random
 func deterministicRandom() uint64 {
 	b := getg().bubble
-	if b == nil || b.deterministic == nil {
-		return rand()
+	if b != nil && b.deterministic != nil {
+		return bubbleRandom(b.deterministic)
 	}
-	d := b.deterministic
+
+	// Mirror rand's ordinary loop to avoid an extra call frame per draw.
+	// Keep refill pinning identical; runtime-internal draws still use rand.
+	mp := getg().m
+	c := &mp.chacha8
+	for {
+		x, ok := c.Next()
+		if ok {
+			return x
+		}
+		mp.locks++
+		c.Refill()
+		mp.locks--
+	}
+}
+
+// Keep callback/defer state off ordinary package-level random draws.
+func bubbleRandom(d *deterministicBubble) uint64 {
 	if d.randomActive {
 		panic("runtime/bubble: random source must not call package-level randomness")
 	}

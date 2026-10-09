@@ -11,10 +11,11 @@
 // the host. Separate bubbles may run concurrently.
 //
 // The supported synchronization primitives are owned channels, select, and
-// runtime.Gosched. Native Sleep and channel timers require explicit host timer
-// authorization. This is not a memory sandbox: callers must avoid ambient I/O,
+// runtime.Gosched. Native Sleep and positive channel or callback timers require
+// explicit host timer authorization. Nonpositive timers become ready locally.
+// This is not a memory sandbox: callers must avoid ambient I/O,
 // shared mutable state, map-dependent ordering, and other nondeterministic
-// inputs. General sync, context, Ticker, and AfterFunc support is not promised.
+// inputs. General sync, context, and Ticker support is not promised.
 // Explicit runtime.GC calls, iterator coroutine transfers, and sync.Cond waits
 // inside the bubble are rejected. Garbage collection initiated by the host is
 // allowed.
@@ -24,10 +25,13 @@
 // fresh PCG is seeded with (Options.Seed, 0). Application randomness is separate
 // from scheduler choices. Explicitly constructed random generators retain their
 // own sources. crypto/rand is unchanged and is not made deterministic.
-// An unrecovered user goroutine panic can terminate the process. Close cannot
-// dispose of live goroutines, so experiments requiring forced disposal should
-// run in a subprocess. Unsupported runtime operations, including blocking or
-// yielding during Deliver, may also terminate the process.
+// An unrecovered user goroutine panic faults the bubble after normal defer
+// unwinding and pauses its peers. Close discards paused owned channel, select,
+// nil-channel, and Sleep waits, plus queued runnable goroutines, without running
+// user defers. It rejects other live waits without modifying execution.
+// Close stops the world and scans all goroutines in this prototype. Unsupported
+// runtime operations, including blocking or yielding during Deliver, may still
+// terminate the process. An active CPU loop cannot be disposed of through Close.
 //
 // At the maximum logical timestamp (2262-04-11T23:47:16.854775807Z), creating or
 // resetting a timer and positive-duration Sleep panic. Nonpositive Sleep still
@@ -46,8 +50,8 @@ import (
 	"time"
 )
 
-// Protocol identifies this experimental scheduling policy.
-const Protocol = "cooperative-v1"
+// RangeProtocol selects the experimental range-retirement execution policy.
+const RangeProtocol = "cooperative-v3-ranges"
 
 // Options configures a new bubble. Seed zero is a reproducible seed.
 type Options struct {
@@ -97,8 +101,7 @@ const (
 	Quiescent Status = iota
 	// Completed means every user goroutine has exited.
 	Completed
-	// Faulted means a wrapped delivery callback panicked. Arbitrary user
-	// goroutine panics are not contained by this prototype.
+	// Faulted means a delivery callback or unrecovered user goroutine panicked.
 	Faulted
 )
 
@@ -137,7 +140,9 @@ type Delivery struct {
 
 // FireTimer authorizes a timer generation at or after its deadline. It returns
 // false for a known stale, canceled, or already authorized generation. Unknown
-// IDs, early authorization, and use outside the owning callback panic.
+// IDs, early authorization, and use outside the owning callback panic. Under
+// RangeProtocol, acknowledged IDs ignore positive generations; zero
+// generations remain invalid.
 func (d *Delivery) FireTimer(id TimerID, generation uint64) bool {
 	if d == nil || !d.active.Load() {
 		panic("bubble: delivery is no longer active")
@@ -145,14 +150,24 @@ func (d *Delivery) FireTimer(id TimerID, generation uint64) bool {
 	return runtimebubble.FireTimer(d.handle, uint64(id), generation)
 }
 
+// RetireTimerRange acknowledges inclusive inactive IDs under RangeProtocol.
+// Unknown IDs, reversed ranges and active timers reject before mutation.
+// Late positive generations are ignored; Reset allocates a fresh ID.
+func (d *Delivery) RetireTimerRange(first, last TimerID) {
+	if d == nil || !d.active.Load() {
+		panic("bubble: delivery is no longer active")
+	}
+	runtimebubble.RetireTimerRange(d.handle, uint64(first), uint64(last))
+}
+
 // New creates a paused bubble without executing f. An empty Protocol selects
-// Protocol. Zero StartTime selects 2000-01-01 UTC. Times must be positive,
+// RangeProtocol. Zero StartTime selects 2000-01-01 UTC. Times must be positive,
 // representable signed Unix nanoseconds; monotonic readings are discarded.
 func New(opts Options, f func()) (*Bubble, error) {
 	if runtimebubble.IsBubbled() {
 		return nil, errors.New("bubble: controller called from inside a bubble")
 	}
-	if opts.Protocol != "" && opts.Protocol != Protocol {
+	if opts.Protocol != "" && opts.Protocol != RangeProtocol {
 		return nil, fmt.Errorf("bubble: unsupported protocol %q", opts.Protocol)
 	}
 	if f == nil {
@@ -257,9 +272,13 @@ func (b *Bubble) Step(a Activation) (state State, err error) {
 			err = deliveryPanicError(v)
 		}
 	}()
-	state = publicState(runtimebubble.Step(b.handle, now.UnixNano(), deliver))
+	result := runtimebubble.Step(b.handle, now.UnixNano(), deliver)
+	state = publicState(result)
 	b.status = state.Status
 	returned = true
+	if state.Status == Faulted {
+		return state, errors.New("bubble: " + result.Failure)
+	}
 	return state, nil
 }
 
@@ -281,6 +300,9 @@ func publicState(r runtimebubble.State) State {
 	if r.LiveGoroutines == 0 {
 		s.Status = Completed
 	}
+	if r.Failure != "" {
+		s.Status = Faulted
+	}
 	for _, change := range r.TimerChanges {
 		c := TimerChange{Kind: TimerChangeKind(change.Kind), ID: TimerID(change.ID), Generation: change.Generation}
 		if c.Kind == TimerArmed {
@@ -291,8 +313,9 @@ func publicState(r runtimebubble.State) State {
 	return s
 }
 
-// Close releases a finished or never-started bubble. It rejects live execution
-// without changing its state, and is idempotent after success.
+// Close releases a finished or never-started bubble, or discards supported paused
+// execution without running user defers. Unsupported live waits are unchanged.
+// Close stops the world; it is idempotent after success.
 func (b *Bubble) Close() error {
 	if err := b.enter(); err != nil {
 		return err
@@ -305,7 +328,7 @@ func (b *Bubble) Close() error {
 		return errors.New("bubble: uninitialized bubble")
 	}
 	if !runtimebubble.Close(b.handle) {
-		return errors.New("bubble: cannot close live goroutines")
+		return errors.New("bubble: cannot dispose unsupported or active goroutines")
 	}
 	b.closed, b.handle = true, nil
 	return nil

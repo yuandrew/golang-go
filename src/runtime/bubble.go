@@ -21,6 +21,8 @@ type deterministicBubble struct {
 	f            func()
 	started      bool
 	closed       bool
+	disposing    bool
+	failure      string
 	stepping     bool
 	waiting      bool // controller is waiting for quiescence
 	delivering   bool
@@ -70,7 +72,11 @@ func deterministicRelease(gp *g, yield bool) {
 	if yield {
 		d.runq.pushBack(gp)
 	}
-	next := d.runq.pop()
+	var next *g
+	// A fault pauses peers; teardown wakes the controller after the exit.
+	if d.failure == "" || d.disposing {
+		next = d.runq.pop()
+	}
 	if next != nil {
 		d.owner.Store(uintptr(unsafe.Pointer(next)))
 	}
@@ -78,6 +84,20 @@ func deterministicRelease(gp *g, yield bool) {
 	if next != nil {
 		runqput(getg().m.p.ptr(), next, false)
 		wakep()
+	}
+}
+
+func (b *synctestBubble) deterministicFaultWake() {
+	d := b.deterministic
+	lock(&b.mu)
+	var controller *g
+	if d.failure != "" && !d.disposing && d.waiting {
+		d.waiting = false
+		controller = b.root
+	}
+	unlock(&b.mu)
+	if controller != nil {
+		goready(controller, 0)
 	}
 }
 
@@ -106,6 +126,23 @@ func deterministicCheckChan(c *hchan) {
 	b := getg().bubble
 	if b != nil && b.deterministic != nil && c.bubble != b {
 		fatal("runtime/bubble: channel belongs to another execution domain")
+	}
+}
+
+// Validate unsupported waits only on the opted-in scheduler path.
+func bubblePark(gp *g, reason waitReason) {
+	d := gp.bubble.deterministic
+	if d == nil {
+		return
+	}
+	if d.randomActive && reason.isIdleInSynctest() {
+		fatal("runtime/bubble: random source must not block")
+	}
+	if d.delivering && reason.isIdleInSynctest() {
+		fatal("runtime/bubble: delivery callback must not block")
+	}
+	if reason.isMutexWait() || reason == waitReasonSyncWaitGroupWait || reason == waitReasonIOWait {
+		fatal("runtime/bubble: unsupported external blocking operation")
 	}
 }
 
@@ -181,6 +218,7 @@ func deterministicStep(handle any, now int64, deliver func()) (state bubbleapi.S
 		raceacquireg(gp, b.raceaddr())
 	}
 	state.RootDone = b.done
+	state.Failure = d.failure
 	state.LiveGoroutines = b.total - 1 // exclude the attached controller
 	state.TimerChanges = b.deterministicTimerChanges()
 	return state
@@ -203,6 +241,7 @@ func deterministicIdle(gp *g, _ unsafe.Pointer) bool {
 func deterministicSnapshot(handle any) bubbleapi.State {
 	b := handle.(*synctestBubble)
 	return bubbleapi.State{
+		Failure:        b.deterministic.failure,
 		RootDone:       b.done,
 		LiveGoroutines: b.total,
 		TimerChanges:   b.deterministicTimerChanges(),
@@ -213,7 +252,10 @@ func deterministicSnapshot(handle any) bubbleapi.State {
 func deterministicClose(handle any) bool {
 	b := handle.(*synctestBubble)
 	d := b.deterministic
-	if d.stepping || b.total != 0 {
+	if d.stepping {
+		return false
+	}
+	if b.total != 0 && !b.deterministicDispose() {
 		return false
 	}
 	d.closed = true
@@ -224,6 +266,127 @@ func deterministicClose(handle any) bool {
 	return true
 }
 
+// deterministicDispose discards paused execution without running user defers.
+// Preflight all waits before detaching any; unsupported states remain usable.
+func (b *synctestBubble) deterministicDispose() bool {
+	d := b.deterministic
+	stw := stopTheWorld(stwAllGoroutinesStack)
+	for _, gp := range allGsSnapshot() {
+		if gp.bubble != b {
+			continue
+		}
+		status := readgstatus(gp)
+		if status == _Grunnable {
+			if gp.sched.lr != 0 && gp.sched.pc != gp.startpc {
+				startTheWorld(stw)
+				return false
+			}
+			continue
+		}
+		if status != _Gwaiting || !deterministicDisposable(gp) {
+			startTheWorld(stw)
+			return false
+		}
+		for sg := gp.waiting; sg != nil; sg = sg.waitlink {
+			if sg.c.get() == nil || sg.c.get().bubble != b {
+				startTheWorld(stw)
+				return false
+			}
+		}
+	}
+	d.disposing = true
+	for _, entry := range d.timers.registered {
+		reg := entry.timer
+		if reg == nil {
+			continue
+		}
+		if reg.timer != nil {
+			reg.timer.when = 0
+		}
+		reg.armed = false
+		reg.timer = nil
+	}
+	f := deterministicExit
+	fv := *(**funcval)(unsafe.Pointer(&f))
+	for _, gp := range allGsSnapshot() {
+		if gp.bubble != b {
+			continue
+		}
+		deterministicUnlink(gp)
+		// Insert a runtime-only exit frame; existing stack frames remain valid
+		// for GC until normal scheduler teardown destroys this goroutine.
+		if gp.sched.lr != 0 {
+			// A never-started goroutine already has its goexit return frame.
+			gp.sched.pc = fv.fn
+			gp.sched.ctxt = unsafe.Pointer(fv)
+		} else {
+			gostartcallfn(&gp.sched, fv)
+		}
+		if readgstatus(gp) == _Gwaiting {
+			goready(gp, 0)
+		}
+	}
+	startTheWorld(stw)
+	deterministicStep(b, b.now, nil)
+	return b.total == 0
+}
+
+func deterministicDisposable(gp *g) bool {
+	switch gp.waitreason {
+	case waitReasonSynctestChanReceive, waitReasonSynctestChanSend,
+		waitReasonSynctestSelect, waitReasonChanReceiveNilChan,
+		waitReasonChanSendNilChan, waitReasonSelectNoCases, waitReasonSleep:
+		return true
+	}
+	return false
+}
+
+// deterministicUnlink removes owned channel registrations before stack disposal.
+// The world is stopped; channel locks also preserve stack-copying invariants.
+func deterministicUnlink(gp *g) {
+	for sg := gp.waiting; sg != nil; {
+		next := sg.waitlink
+		c := sg.c.get()
+		lock(&c.lock)
+		found := false
+		for item := c.sendq.first; item != nil; item = item.next {
+			if item == sg {
+				c.sendq.dequeueSudoG(sg)
+				found = true
+				break
+			}
+		}
+		if !found {
+			c.recvq.dequeueSudoG(sg)
+		}
+		if c.timer != nil {
+			unblockTimerChan(c)
+		}
+		unlock(&c.lock)
+		sg.elem.set(nil)
+		sg.c.set(nil)
+		sg.isSelect = false
+		sg.waitlink = nil
+		releaseSudog(sg)
+		sg = next
+	}
+	gp.waiting = nil
+	gp.activeStackChans = false
+	gp.selectDone.Store(0)
+	gp.param = nil
+}
+
+func deterministicExit() {
+	// A discarded goroutine may have parked while unwinding a panic.
+	for p := getg()._panic; p != nil; p = p.link {
+		if !p.goexit {
+			runningPanicDefers.Add(-1)
+		}
+	}
+	getg()._panic = nil
+	goexit1()
+}
+
 //go:linkname deterministicFire internal/runtime/bubble.FireTimer
 func deterministicFire(handle any, id, generation uint64) bool {
 	b := handle.(*synctestBubble)
@@ -231,6 +394,15 @@ func deterministicFire(handle any, id, generation uint64) bool {
 		panic(errorString("runtime/bubble: timer delivery outside activation"))
 	}
 	return b.deterministicFireTimer(id, generation)
+}
+
+//go:linkname deterministicRetireRange internal/runtime/bubble.RetireTimerRange
+func deterministicRetireRange(handle any, first, last uint64) {
+	b := handle.(*synctestBubble)
+	if getg().bubble != b || !b.deterministic.delivering || getg() != b.root {
+		panic(errorString("runtime/bubble: timer retirement outside activation"))
+	}
+	b.deterministic.timers.retireRange(first, last)
 }
 
 //go:linkname deterministicIsBubbled internal/runtime/bubble.IsBubbled

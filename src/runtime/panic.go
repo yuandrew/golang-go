@@ -865,6 +865,23 @@ func gopanic(e any) {
 		fn()
 	}
 
+	if b := gp.bubble; b != nil && b.deterministic != nil && gp != b.root {
+		// User defers and recover keep ordinary semantics. An unrecovered
+		// bubble panic becomes a host fault without formatting user objects.
+		d := b.deterministic
+		if d.failure == "" {
+			d.failure = "user goroutine panic (non-string value)"
+			if message, ok := e.(string); ok {
+				const maxMessage = 256
+				if len(message) > maxMessage {
+					message = message[:maxMessage]
+				}
+				d.failure = "user goroutine panic: " + message
+			}
+		}
+		deterministicExit()
+	}
+
 	// If we're tracing, flush the current generation to make the trace more
 	// readable.
 	//
