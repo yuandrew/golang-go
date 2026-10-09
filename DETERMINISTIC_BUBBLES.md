@@ -6,6 +6,9 @@ followed by API documentation changes.
 
 ## Review
 
+Read the [concept inventory](BUBBLE_CONCEPTS.md) to separate existing Go machinery,
+Quinn's new execution contract, our additions and private optimization policies.
+
 Quinn's baseline is `8dea6502fad43cc3ae715806fcb93e575027c8d0`.
 Compare that commit with this branch to review our additions. The imported
 candidate contains 34 source/test files identified by source hashes; its manifest
