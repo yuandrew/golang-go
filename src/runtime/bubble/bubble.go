@@ -123,8 +123,8 @@ const (
 )
 
 // TimerChange records a timer registration or cancellation in operation order.
-// Deadline is meaningful only for TimerArmed. A timer retains its ID across
-// resets, but each registration has a new Generation.
+// Deadline is meaningful only for TimerArmed. Reset retains the ID and advances
+// Generation until the host acknowledges that ID; Reset then assigns a fresh ID.
 type TimerChange struct {
 	Kind       TimerChangeKind
 	ID         TimerID

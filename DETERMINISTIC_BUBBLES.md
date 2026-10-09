@@ -13,7 +13,7 @@ Quinn's baseline is `8dea6502fad43cc3ae715806fcb93e575027c8d0`.
 Compare that commit with this branch to review our additions. The imported
 candidate contains 34 source/test files identified by source hashes; its manifest
 SHA256 is `2c60cc2b4fa916cd849daf518283c6ef482a34a39bea46952e8b19cf1ea24a4b`.
-The subsequent Close comment changes documentation only. Frozen measurements
+Subsequent documentation commits change no runtime behavior. Frozen measurements
 retain their original source identities.
 
 Start with [`runtime/bubble`](src/runtime/bubble/bubble.go), then the

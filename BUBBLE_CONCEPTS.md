@@ -33,7 +33,8 @@ execution mode; we do not introduce new syntax or replace the ordinary scheduler
 
 ## New lifecycle contract — our additions
 
-- **Terminal panic reporting:** after ordinary defer/recover handling, an
+- **Terminal panic reporting:** Quinn already reported wrapped Deliver panics;
+  our addition handles unrecovered user goroutine panics. After defer/recover, an
   unrecovered user panic pauses peers and returns a fault to the host. Blocked
   defers can delay reporting; runtime-fatal errors remain process-fatal.
   [Panic path](src/runtime/panic.go), [fault scheduling](src/runtime/bubble.go).
@@ -60,8 +61,9 @@ These affect correctness or cost; they are not new public primitives.
 - **Shrink timer capacity at boundaries:** consider resizing when collecting
   timer changes, normally at the end of Step. That boundary already existed;
   deferring this resize to it is our optimization. There is no fixed event count
-  or time window defining a batch. Current tuning shrinks at one-quarter capacity
-  and allocates twice the remaining length. These constants are implementation
+  or time window defining a batch. Current tuning shrinks at or below one-quarter
+  capacity and allocates twice the registration slice length, which can include
+  un-compacted holes. These constants are implementation
   choices, not API promises. [deterministicTimerChanges](src/runtime/bubble_time.go).
 - **GC-safe owned channel headers:** GC scans the owner pointer even for
   pointer-free channel values. This preserves ownership identity; some owned
@@ -77,8 +79,8 @@ These affect correctness or cost; they are not new public primitives.
 
 - **Temporal/Core replay:** implemented in separate research adapters. History
   mapping, activities, signals and durable reconstruction are not Go primitives.
-- **Callback timers:** implemented/tested source remains here, but AfterFunc is
-  excluded from the initial support promise.
+- **Callback timers:** behavior was added and tested by us. Source remains here,
+  but AfterFunc is experimental and excluded from the initial support promise.
 - **Context:** earlier prototypes were removed from this candidate.
 - **WaitGroup, general locks, tickers and deterministic map traversal:** deferred;
   investigations do not imply support. Command-sensitive map logic sorts keys.
