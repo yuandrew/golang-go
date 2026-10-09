@@ -314,8 +314,15 @@ func publicState(r runtimebubble.State) State {
 }
 
 // Close releases a finished or never-started bubble, or discards supported paused
-// execution without running user defers. Unsupported live waits are unchanged.
-// Close stops the world; it is idempotent after success.
+// execution without running user defers. It rejects an active Step or unsupported
+// live waits without discarding any goroutines. Close is idempotent after success.
+//
+// When owned goroutines remain, Close stops the entire Go process while validating
+// their states and detaching supported waits. This also pauses unrelated
+// goroutines outside the bubble. Inspection scans the process's goroutine list;
+// pause duration depends on process and bubble size and has no guaranteed maximum.
+// A rejected disposal can also incur this pause. Closing a bubble with no
+// remaining goroutines does not require this disposal pause.
 func (b *Bubble) Close() error {
 	if err := b.enter(); err != nil {
 		return err
