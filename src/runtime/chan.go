@@ -88,12 +88,23 @@ func makechan(t *chantype, size int) *hchan {
 		panic(plainError("makechan: size out of range"))
 	}
 
-	// Hchan does not contain pointers interesting for GC when elements stored in buf do not contain pointers.
+	b := getg().bubble
+
+	// Ordinary hchan headers need no scanning when buffer elements have no pointers.
+	// Owned headers must keep their execution-domain identity alive.
 	// buf points into the same allocation, elemtype is persistent.
 	// SudoG's are referenced from their owning thread so they can't be collected.
 	// TODO(dvyukov,rlh): Rethink when collector can move allocated objects.
 	var c *hchan
 	switch {
+	case b != nil:
+		// Scan the owner pointer even for zero-sized or pointer-free elements.
+		c = new(hchan)
+		if mem == 0 {
+			c.buf = c.raceaddr()
+		} else {
+			c.buf = mallocgc(mem, elem, true)
+		}
 	case mem == 0:
 		// Queue or element size is zero.
 		c = (*hchan)(mallocgc(hchanSize, nil, true))
@@ -113,9 +124,7 @@ func makechan(t *chantype, size int) *hchan {
 	c.elemsize = uint16(elem.Size_)
 	c.elemtype = elem
 	c.dataqsiz = uint(size)
-	if b := getg().bubble; b != nil {
-		c.bubble = b
-	}
+	c.bubble = b
 	lockInit(&c.lock, lockRankHchan)
 
 	if debugChan {
@@ -182,8 +191,14 @@ func chansend(c *hchan, ep unsafe.Pointer, block bool, callerpc uintptr) bool {
 		racereadpc(c.raceaddr(), callerpc, abi.FuncPCABIInternal(chansend))
 	}
 
-	if c.bubble != nil && getg().bubble != c.bubble {
-		fatal("send on synctest channel from outside bubble")
+	// Matching owners include the ordinary nil/nil fast path.
+	if c.bubble != getg().bubble {
+		if getg().bubble != nil {
+			deterministicCheckChan(c)
+		}
+		if c.bubble != nil {
+			fatal("send on synctest channel from outside bubble")
+		}
 	}
 
 	// Fast path: check for failed non-blocking operation without acquiring the lock.
@@ -407,8 +422,14 @@ func closechan(c *hchan) {
 	if c == nil {
 		panic(plainError("close of nil channel"))
 	}
-	if c.bubble != nil && getg().bubble != c.bubble {
-		fatal("close of synctest channel from outside bubble")
+	// Matching owners include the ordinary nil/nil fast path.
+	if c.bubble != getg().bubble {
+		if getg().bubble != nil {
+			deterministicCheckChan(c)
+		}
+		if c.bubble != nil {
+			fatal("close of synctest channel from outside bubble")
+		}
 	}
 
 	lock(&c.lock)
@@ -468,6 +489,16 @@ func closechan(c *hchan) {
 		glist.push(gp)
 	}
 	unlock(&c.lock)
+
+	if c.bubble != nil && c.bubble.deterministic != nil {
+		// glist is a stack, but this policy wakes receivers in registration
+		// order, followed by senders in registration order.
+		var ordered gList
+		for !glist.empty() {
+			ordered.push(glist.pop())
+		}
+		glist = ordered
+	}
 
 	// Ready all Gs now that we've dropped the channel lock.
 	for !glist.empty() {
@@ -529,8 +560,14 @@ func chanrecv(c *hchan, ep unsafe.Pointer, block bool) (selected, received bool)
 		throw("unreachable")
 	}
 
-	if c.bubble != nil && getg().bubble != c.bubble {
-		fatal("receive on synctest channel from outside bubble")
+	// Matching owners include the ordinary nil/nil fast path.
+	if c.bubble != getg().bubble {
+		if getg().bubble != nil {
+			deterministicCheckChan(c)
+		}
+		if c.bubble != nil {
+			fatal("receive on synctest channel from outside bubble")
+		}
 	}
 
 	if block {
@@ -809,6 +846,9 @@ func reflect_chanrecv(c *hchan, nb bool, elem unsafe.Pointer) (selected bool, re
 }
 
 func chanlen(c *hchan) int {
+	if getg().bubble != nil {
+		deterministicCheckChan(c)
+	}
 	if c == nil || c.timer != nil {
 		// timer channels have a buffered implementation
 		// but present to users as unbuffered, so that we can
@@ -819,6 +859,9 @@ func chanlen(c *hchan) int {
 }
 
 func chancap(c *hchan) int {
+	if getg().bubble != nil {
+		deterministicCheckChan(c)
+	}
 	if c == nil || c.timer != nil {
 		// timer channels have a buffered implementation
 		// but present to users as unbuffered, so that we can

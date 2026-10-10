@@ -11,6 +11,9 @@
 //
 // Top-level functions, such as [Float64] and [Int],
 // are safe for concurrent use by multiple goroutines.
+// Inside this fork's experimental runtime/bubble, top-level functions use the
+// bubble's configured application random source. Generators constructed with
+// New continue to use the source passed to New.
 //
 // The [ChaCha8] source is a general-purpose source resistant to prediction.
 // The [PCG] source is faster but unfit for security-relevant purposes.
@@ -21,8 +24,8 @@
 package rand
 
 import (
+	runtimebubble "internal/runtime/bubble"
 	"math/bits"
-	_ "unsafe" // for go:linkname
 )
 
 // A Source is a source of uniformly-distributed
@@ -268,14 +271,12 @@ func (r *Rand) Shuffle(n int, swap func(i, j int)) {
 // convenience functions.
 var globalRand = &Rand{src: runtimeSource{}}
 
-//go:linkname runtime_rand runtime.rand
-func runtime_rand() uint64
-
-// runtimeSource is a Source that uses the runtime fastrand functions.
+// runtimeSource supplies package-level values through the runtime's application
+// random bridge, which uses ordinary runtime entropy outside a bubble.
 type runtimeSource struct{}
 
 func (runtimeSource) Uint64() uint64 {
-	return runtime_rand()
+	return runtimebubble.Random()
 }
 
 // Int64 returns a non-negative pseudo-random 63-bit integer as an int64
