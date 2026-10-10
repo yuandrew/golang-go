@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package bubble connects the experimental runtime/bubble API to the runtime.
+// Package bubble connects the runtime/bubble API to the runtime.
 package bubble
 
 import _ "unsafe"

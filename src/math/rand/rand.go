@@ -11,8 +11,8 @@
 //
 // Top-level functions, such as [Float64] and [Int],
 // are safe for concurrent use by multiple goroutines.
-// Inside this fork's experimental runtime/bubble, top-level functions use the
-// bubble's configured application random source and a bubble-local Read buffer.
+// Inside a deterministic bubble, top-level functions use the bubble's configured
+// application random source and a bubble-local Read buffer.
 // Generators constructed with New continue to use their explicit sources.
 //
 // This package's outputs might be easily predictable regardless of how it's
@@ -406,8 +406,8 @@ func (fs *runtimeSource) read(p []byte, readVal *int64, readPos *int8) (n int, e
 //
 // As of Go 1.24 [Seed] is a no-op. To restore the previous behavior set
 // GODEBUG=randseednop=0.
-// Inside runtime/bubble, Seed is always a no-op; the bubble's Options select its
-// source independently of the process-wide generator and GODEBUG settings.
+// Inside a deterministic bubble, Seed is always a no-op. The bubble's Options
+// select its source independently of randautoseed and randseednop.
 func Seed(seed int64) {
 	// Bubble configuration owns its source. Legacy global seeding is a no-op
 	// here, independent of GODEBUG, and must not alter the host's generator.

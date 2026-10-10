@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package bubble provides experimental deterministic, host-driven goroutine
-// execution. This package exists only in this Go runtime fork.
+// Package bubble provides deterministic, host-driven goroutine execution.
 //
 // Descendants inherit their bubble through ordinary go statements. Each bubble
 // runs one user goroutine at a time and has an independent logical clock.
@@ -29,9 +28,9 @@
 // unwinding and pauses its peers. Close discards paused owned channel, select,
 // nil-channel, and Sleep waits, plus queued runnable goroutines, without running
 // user defers. It rejects other live waits without modifying execution.
-// Close stops the world and scans all goroutines in this prototype. Unsupported
-// runtime operations, including blocking or yielding during Deliver, may still
-// terminate the process. An active CPU loop cannot be disposed of through Close.
+// Close stops the world and scans all goroutines. Unsupported runtime operations,
+// including blocking or yielding during Deliver, may still terminate the process.
+// An active CPU loop cannot be disposed of through Close.
 //
 // At the maximum logical timestamp (2262-04-11T23:47:16.854775807Z), creating or
 // resetting a timer and positive-duration Sleep panic. Nonpositive Sleep still
@@ -50,7 +49,7 @@ import (
 	"time"
 )
 
-// RangeProtocol selects the experimental range-retirement execution policy.
+// RangeProtocol selects the range-retirement execution policy.
 const RangeProtocol = "cooperative-v3-ranges"
 
 // Options configures a new bubble. Seed zero is a reproducible seed.
