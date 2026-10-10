@@ -480,6 +480,11 @@ func (st *relocSymState) relocsym(s loader.Sym, P []byte) {
 			if weak && !ldr.AttrReachable(rs) {
 				continue
 			}
+			if target.IsWindows() && target.IsExternal() && rst == sym.STLSBSS {
+				nExtReloc++
+				o = 0
+				break
+			}
 			sect := ldr.SymSect(rs)
 			if sect == nil {
 				if rst == sym.SDYNIMPORT {
@@ -688,6 +693,14 @@ func extreloc(ctxt *Link, ldr *loader.Loader, s loader.Sym, r loader.Reloc) (loa
 		rr.Xadd = r.Add() + off
 		rr.Xsym = rs
 
+	case objabi.R_ADDROFF:
+		if target.IsWindows() && ldr.SymType(r.Sym()) == sym.STLSBSS {
+			rr.Xsym = r.Sym()
+			rr.Xadd = r.Add()
+			break
+		}
+		return rr, false
+
 	case objabi.R_DWARFSECREF:
 		// On most platforms, the external linker needs to adjust DWARF references
 		// as it combines DWARF sections. However, on Darwin, dsymutil does the
@@ -734,7 +747,7 @@ func extreloc(ctxt *Link, ldr *loader.Loader, s loader.Sym, r loader.Reloc) (loa
 		return ExtrelocSimple(ldr, r), true
 
 	// These reloc types don't need external relocations.
-	case objabi.R_ADDROFF, objabi.R_METHODOFF, objabi.R_ADDRCUOFF,
+	case objabi.R_METHODOFF, objabi.R_ADDRCUOFF,
 		objabi.R_SIZE, objabi.R_CONST, objabi.R_GOTOFF,
 		objabi.R_DWTXTADDR_U1, objabi.R_DWTXTADDR_U2,
 		objabi.R_DWTXTADDR_U3, objabi.R_DWTXTADDR_U4:
@@ -1089,7 +1102,7 @@ func writeBlocks(ctxt *Link, out *OutBuf, sem chan int, ldr *loader.Loader, syms
 		}
 
 		// Start the block output operator.
-		if ctxt.Out.isMmapped() {
+		if out.isMmapped() {
 			o := out.View(uint64(out.Offset() + written))
 			sem <- 1
 			wg.Add(1)
@@ -1168,17 +1181,17 @@ func writeBlock(ctxt *Link, out *OutBuf, ldr *loader.Loader, syms []loader.Sym, 
 type writeFn func(*Link, *OutBuf, int64, int64)
 
 // writeParallel handles scheduling parallel execution of data write functions.
-func writeParallel(wg *sync.WaitGroup, fn writeFn, ctxt *Link, seek, vaddr, length uint64) {
-	if ctxt.Out.isMmapped() {
-		out := ctxt.Out.View(seek)
+func writeParallel(wg *sync.WaitGroup, fn writeFn, ctxt *Link, out *OutBuf, seek, vaddr, length uint64) {
+	if out.isMmapped() {
+		out := out.View(seek)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			fn(ctxt, out, int64(vaddr), int64(length))
 		}()
 	} else {
-		ctxt.Out.SeekSet(int64(seek))
-		fn(ctxt, ctxt.Out, int64(vaddr), int64(length))
+		out.SeekSet(int64(seek))
+		fn(ctxt, out, int64(vaddr), int64(length))
 	}
 }
 
@@ -3320,6 +3333,12 @@ func (ctxt *Link) address() []*sym.Segment {
 func (ctxt *Link) layout(order []*sym.Segment) uint64 {
 	var prev *sym.Segment
 	for _, seg := range order {
+		if seg == &Segdwarf && *FlagSplitDWARF && ctxt.IsInternal() {
+			// Segdwarf is written to a separate file, starting after the Mach-O header.
+			seg.Fileoff = uint64(Rnd(int64(HEADR), *FlagRound))
+			seg.Filelen = seg.Length
+			continue
+		}
 		if prev == nil {
 			seg.Fileoff = uint64(HEADR)
 		} else {
@@ -3358,6 +3377,33 @@ func (ctxt *Link) AddTramp(s *loader.SymbolBuilder, typ sym.SymKind) {
 	if *FlagDebugTramp > 0 && ctxt.Debugvlog > 0 {
 		ctxt.Logf("trampoline %s inserted\n", s.Name())
 	}
+}
+
+// AddDwarfDirectTrampoline records a direct trampoline whose static target can
+// be described by an address-valued DW_AT_trampoline.
+func (ctxt *Link) AddDwarfDirectTrampoline(s, target loader.Sym, addend int64, ownerCU *sym.CompilationUnit) {
+	if ownerCU == nil {
+		// TODO: Use a synthetic linker CU for trampolines created by host
+		// object or linker-generated callers.
+		return
+	}
+	if ownerCU.DWInfo == nil {
+		// dwarfGenerateDebugInfo runs before architectures create trampolines,
+		// so a nil DWInfo means DWARF generation is disabled.
+		return
+	}
+	switch ctxt.loader.SymType(target) {
+	case sym.SDYNIMPORT, sym.SUNDEFEXT:
+		// The final destination of a dynamically resolved target is not a
+		// link-time symbol address.
+		return
+	}
+	ctxt.dwarfTrampolines = append(ctxt.dwarfTrampolines, dwarfTrampoline{
+		sym:     s,
+		target:  target,
+		addend:  addend,
+		ownerCU: ownerCU,
+	})
 }
 
 // compressSyms compresses syms and returns the contents of the

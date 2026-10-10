@@ -4,74 +4,74 @@
 
 package archsimd
 
-// BroadcastInt8x16 returns a vector with the input
-// x assigned to all elements of the output.
-func BroadcastInt8x16(x int8) Int8x16 {
-	var z Int8x16
-	return z.SetElem(0, x).broadcast1To16()
+// BroadcastInt8x16 returns a vector with the input x assigned to all elements of the
+// result.
+func BroadcastInt8x16(x int8) (z Int8x16) {
+	var v Int8x16
+	return v.SetElem(0, x).broadcast1To16()
 }
 
-// BroadcastInt16x8 returns a vector with the input
-// x assigned to all elements of the output.
-func BroadcastInt16x8(x int16) Int16x8 {
-	var z Int16x8
-	return z.SetElem(0, x).broadcast1To8()
+// BroadcastInt16x8 returns a vector with the input x assigned to all elements of the
+// result.
+func BroadcastInt16x8(x int16) (z Int16x8) {
+	var v Int16x8
+	return v.SetElem(0, x).broadcast1To8()
 }
 
-// BroadcastInt32x4 returns a vector with the input
-// x assigned to all elements of the output.
-func BroadcastInt32x4(x int32) Int32x4 {
-	var z Int32x4
-	return z.SetElem(0, x).broadcast1To4()
+// BroadcastInt32x4 returns a vector with the input x assigned to all elements of the
+// result.
+func BroadcastInt32x4(x int32) (z Int32x4) {
+	var v Int32x4
+	return v.SetElem(0, x).broadcast1To4()
 }
 
-// BroadcastInt64x2 returns a vector with the input
-// x assigned to all elements of the output.
-func BroadcastInt64x2(x int64) Int64x2 {
-	var z Int64x2
-	return z.SetElem(0, x).broadcast1To2()
+// BroadcastInt64x2 returns a vector with the input x assigned to all elements of the
+// result.
+func BroadcastInt64x2(x int64) (z Int64x2) {
+	var v Int64x2
+	return v.SetElem(0, x).broadcast1To2()
 }
 
-// BroadcastUint8x16 returns a vector with the input
-// x assigned to all elements of the output.
-func BroadcastUint8x16(x uint8) Uint8x16 {
-	var z Uint8x16
-	return z.SetElem(0, x).broadcast1To16()
+// BroadcastUint8x16 returns a vector with the input x assigned to all elements of the
+// result.
+func BroadcastUint8x16(x uint8) (z Uint8x16) {
+	var v Uint8x16
+	return v.SetElem(0, x).broadcast1To16()
 }
 
-// BroadcastUint16x8 returns a vector with the input
-// x assigned to all elements of the output.
-func BroadcastUint16x8(x uint16) Uint16x8 {
-	var z Uint16x8
-	return z.SetElem(0, x).broadcast1To8()
+// BroadcastUint16x8 returns a vector with the input x assigned to all elements of the
+// result.
+func BroadcastUint16x8(x uint16) (z Uint16x8) {
+	var v Uint16x8
+	return v.SetElem(0, x).broadcast1To8()
 }
 
-// BroadcastUint32x4 returns a vector with the input
-// x assigned to all elements of the output.
-func BroadcastUint32x4(x uint32) Uint32x4 {
-	var z Uint32x4
-	return z.SetElem(0, x).broadcast1To4()
+// BroadcastUint32x4 returns a vector with the input x assigned to all elements of the
+// result.
+func BroadcastUint32x4(x uint32) (z Uint32x4) {
+	var v Uint32x4
+	return v.SetElem(0, x).broadcast1To4()
 }
 
-// BroadcastUint64x2 returns a vector with the input
-// x assigned to all elements of the output.
-func BroadcastUint64x2(x uint64) Uint64x2 {
-	var z Uint64x2
-	return z.SetElem(0, x).broadcast1To2()
+// BroadcastUint64x2 returns a vector with the input x assigned to all elements of the
+// result.
+func BroadcastUint64x2(x uint64) (z Uint64x2) {
+	var v Uint64x2
+	return v.SetElem(0, x).broadcast1To2()
 }
 
-// BroadcastFloat32x4 returns a vector with the input
-// x assigned to all elements of the output.
-func BroadcastFloat32x4(x float32) Float32x4 {
-	var z Float32x4
-	return z.SetElem(0, x).broadcast1To4()
+// BroadcastFloat32x4 returns a vector with the input x assigned to all elements of the
+// result.
+func BroadcastFloat32x4(x float32) (z Float32x4) {
+	var v Float32x4
+	return v.SetElem(0, x).broadcast1To4()
 }
 
-// BroadcastFloat64x2 returns a vector with the input
-// x assigned to all elements of the output.
-func BroadcastFloat64x2(x float64) Float64x2 {
-	var z Float64x2
-	return z.SetElem(0, x).broadcast1To2()
+// BroadcastFloat64x2 returns a vector with the input x assigned to all elements of the
+// result.
+func BroadcastFloat64x2(x float64) (z Float64x2) {
+	var v Float64x2
+	return v.SetElem(0, x).broadcast1To2()
 }
 
 // String returns a string representation of SIMD vector x.
@@ -147,276 +147,240 @@ func (x Float64x2) String() string {
 // HiToLo returns a vector with the upper 64 bits zeroed and the lower
 // 64 bits replaced with the upper 64 bits of x.
 func (x Int8x16) HiToLo() Int8x16 {
-	var z Int8x16
-	return z.ToBits().ReshapeToUint64s().BitsToFloat64().SetElem(0, x.ToBits().ReshapeToUint64s().BitsToFloat64().GetElem(1)).ToBits().ReshapeToUint8s().BitsToInt8()
+	var v Int8x16
+	return v.ToBits().ReshapeToUint64s().BitsToFloat64().SetElem(0, x.ToBits().ReshapeToUint64s().BitsToFloat64().GetElem(1)).ToBits().ReshapeToUint8s().BitsToInt8()
 }
 
 // HiToLo returns a vector with the upper 64 bits zeroed and the lower
 // 64 bits replaced with the upper 64 bits of x.
 func (x Int16x8) HiToLo() Int16x8 {
-	var z Int16x8
-	return z.ToBits().ReshapeToUint64s().BitsToFloat64().SetElem(0, x.ToBits().ReshapeToUint64s().BitsToFloat64().GetElem(1)).ToBits().ReshapeToUint16s().BitsToInt16()
+	var v Int16x8
+	return v.ToBits().ReshapeToUint64s().BitsToFloat64().SetElem(0, x.ToBits().ReshapeToUint64s().BitsToFloat64().GetElem(1)).ToBits().ReshapeToUint16s().BitsToInt16()
 }
 
 // HiToLo returns a vector with the upper 64 bits zeroed and the lower
 // 64 bits replaced with the upper 64 bits of x.
 func (x Int32x4) HiToLo() Int32x4 {
-	var z Int32x4
-	return z.ToBits().ReshapeToUint64s().BitsToFloat64().SetElem(0, x.ToBits().ReshapeToUint64s().BitsToFloat64().GetElem(1)).ToBits().ReshapeToUint32s().BitsToInt32()
+	var v Int32x4
+	return v.ToBits().ReshapeToUint64s().BitsToFloat64().SetElem(0, x.ToBits().ReshapeToUint64s().BitsToFloat64().GetElem(1)).ToBits().ReshapeToUint32s().BitsToInt32()
 }
 
 // HiToLo returns a vector with the upper 64 bits zeroed and the lower
 // 64 bits replaced with the upper 64 bits of x.
 func (x Int64x2) HiToLo() Int64x2 {
-	var z Int64x2
-	return z.ToBits().BitsToFloat64().SetElem(0, x.ToBits().BitsToFloat64().GetElem(1)).ToBits().BitsToInt64()
+	var v Int64x2
+	return v.ToBits().BitsToFloat64().SetElem(0, x.ToBits().BitsToFloat64().GetElem(1)).ToBits().BitsToInt64()
 }
 
 // HiToLo returns a vector with the upper 64 bits zeroed and the lower
 // 64 bits replaced with the upper 64 bits of x.
 func (x Uint8x16) HiToLo() Uint8x16 {
-	var z Uint8x16
-	return z.ReshapeToUint64s().BitsToFloat64().SetElem(0, x.ReshapeToUint64s().BitsToFloat64().GetElem(1)).ToBits().ReshapeToUint8s()
+	var v Uint8x16
+	return v.ReshapeToUint64s().BitsToFloat64().SetElem(0, x.ReshapeToUint64s().BitsToFloat64().GetElem(1)).ToBits().ReshapeToUint8s()
 }
 
 // HiToLo returns a vector with the upper 64 bits zeroed and the lower
 // 64 bits replaced with the upper 64 bits of x.
 func (x Uint16x8) HiToLo() Uint16x8 {
-	var z Uint16x8
-	return z.ReshapeToUint64s().BitsToFloat64().SetElem(0, x.ReshapeToUint64s().BitsToFloat64().GetElem(1)).ToBits().ReshapeToUint16s()
+	var v Uint16x8
+	return v.ReshapeToUint64s().BitsToFloat64().SetElem(0, x.ReshapeToUint64s().BitsToFloat64().GetElem(1)).ToBits().ReshapeToUint16s()
 }
 
 // HiToLo returns a vector with the upper 64 bits zeroed and the lower
 // 64 bits replaced with the upper 64 bits of x.
 func (x Uint32x4) HiToLo() Uint32x4 {
-	var z Uint32x4
-	return z.ReshapeToUint64s().BitsToFloat64().SetElem(0, x.ReshapeToUint64s().BitsToFloat64().GetElem(1)).ToBits().ReshapeToUint32s()
+	var v Uint32x4
+	return v.ReshapeToUint64s().BitsToFloat64().SetElem(0, x.ReshapeToUint64s().BitsToFloat64().GetElem(1)).ToBits().ReshapeToUint32s()
 }
 
 // HiToLo returns a vector with the upper 64 bits zeroed and the lower
 // 64 bits replaced with the upper 64 bits of x.
 func (x Uint64x2) HiToLo() Uint64x2 {
-	var z Uint64x2
-	return z.BitsToFloat64().SetElem(0, x.BitsToFloat64().GetElem(1)).ToBits()
+	var v Uint64x2
+	return v.BitsToFloat64().SetElem(0, x.BitsToFloat64().GetElem(1)).ToBits()
 }
 
 // HiToLo returns a vector with the upper 64 bits zeroed and the lower
 // 64 bits replaced with the upper 64 bits of x.
 func (x Float32x4) HiToLo() Float32x4 {
-	var z Float32x4
-	return z.ToBits().ReshapeToUint64s().BitsToFloat64().SetElem(0, x.ToBits().ReshapeToUint64s().BitsToFloat64().GetElem(1)).ToBits().ReshapeToUint32s().BitsToFloat32()
+	var v Float32x4
+	return v.ToBits().ReshapeToUint64s().BitsToFloat64().SetElem(0, x.ToBits().ReshapeToUint64s().BitsToFloat64().GetElem(1)).ToBits().ReshapeToUint32s().BitsToFloat32()
 }
 
 // HiToLo returns a vector with the upper 64 bits zeroed and the lower
 // 64 bits replaced with the upper 64 bits of x.
 func (x Float64x2) HiToLo() Float64x2 {
-	var z Float64x2
-	return z.SetElem(0, x.GetElem(1))
+	var v Float64x2
+	return v.SetElem(0, x.GetElem(1))
 }
 
-// ToMask returns a mask whose i'th element is set if x[i] is non-zero.
-func (from Int8x16) ToMask() (to Mask8x16) {
-	return from.NotEqual(Int8x16{})
+// ToMask returns a mask indicating which elements of x are non-zero.
+//
+//	z[i] = x[i] != 0
+func (x Int8x16) ToMask() (z Mask8x16) {
+	return x.NotEqual(Int8x16{})
 }
 
-// ToMask returns a mask whose i'th element is set if x[i] is non-zero.
-func (from Int16x8) ToMask() (to Mask16x8) {
-	return from.NotEqual(Int16x8{})
+// ToMask returns a mask indicating which elements of x are non-zero.
+//
+//	z[i] = x[i] != 0
+func (x Int16x8) ToMask() (z Mask16x8) {
+	return x.NotEqual(Int16x8{})
 }
 
-// ToMask returns a mask whose i'th element is set if x[i] is non-zero.
-func (from Int32x4) ToMask() (to Mask32x4) {
-	return from.NotEqual(Int32x4{})
+// ToMask returns a mask indicating which elements of x are non-zero.
+//
+//	z[i] = x[i] != 0
+func (x Int32x4) ToMask() (z Mask32x4) {
+	return x.NotEqual(Int32x4{})
 }
 
-// ToMask returns a mask whose i'th element is set if x[i] is non-zero.
-func (from Int64x2) ToMask() (to Mask64x2) {
-	return from.NotEqual(Int64x2{})
+// ToMask returns a mask indicating which elements of x are non-zero.
+//
+//	z[i] = x[i] != 0
+func (x Int64x2) ToMask() (z Mask64x2) {
+	return x.NotEqual(Int64x2{})
 }
 
-// RotateAllLeft rotates all elements left by the specified amount
+// RotateAllLeft rotates each element of x left by shift bits.
+//
+//	z[i] = rotateLeft(x[i], shift)
 //
 // Emulated
-func (x Int8x16) RotateAllLeft(dist uint64) Int8x16 {
-	dist = dist & (8 - 1)
-	ndist := 8 - dist
-	return x.ToBits().ShiftAllLeft(dist).Or(x.ToBits().ShiftAllRight(ndist)).BitsToInt8()
+func (x Uint8x16) RotateAllLeft(shift uint64) (z Uint8x16) {
+	shift = shift & (8 - 1)
+	nshift := 8 - shift
+	return x.ShiftAllLeft(shift).Or(x.ShiftAllRight(nshift))
 }
 
-// RotateAllRight rotates all elements right by the specified amount
+// RotateAllRight rotates each element of x right by shift bits.
+//
+//	z[i] = rotateRight(x[i], shift)
 //
 // Emulated
-func (x Int8x16) RotateAllRight(dist uint64) Int8x16 {
-	dist = dist & (8 - 1)
-	ndist := 8 - dist
-	return x.ToBits().ShiftAllLeft(ndist).Or(x.ToBits().ShiftAllRight(dist)).BitsToInt8()
+func (x Uint8x16) RotateAllRight(shift uint64) (z Uint8x16) {
+	shift = shift & (8 - 1)
+	nshift := 8 - shift
+	return x.ShiftAllLeft(nshift).Or(x.ShiftAllRight(shift))
 }
 
-// RotateAllLeft rotates all elements left by the specified amount
+// RotateAllLeft rotates each element of x left by shift bits.
+//
+//	z[i] = rotateLeft(x[i], shift)
 //
 // Emulated
-func (x Int16x8) RotateAllLeft(dist uint64) Int16x8 {
-	dist = dist & (16 - 1)
-	ndist := 16 - dist
-	return x.ToBits().ShiftAllLeft(dist).Or(x.ToBits().ShiftAllRight(ndist)).BitsToInt16()
+func (x Uint16x8) RotateAllLeft(shift uint64) (z Uint16x8) {
+	shift = shift & (16 - 1)
+	nshift := 16 - shift
+	return x.ShiftAllLeft(shift).Or(x.ShiftAllRight(nshift))
 }
 
-// RotateAllRight rotates all elements right by the specified amount
+// RotateAllRight rotates each element of x right by shift bits.
+//
+//	z[i] = rotateRight(x[i], shift)
 //
 // Emulated
-func (x Int16x8) RotateAllRight(dist uint64) Int16x8 {
-	dist = dist & (16 - 1)
-	ndist := 16 - dist
-	return x.ToBits().ShiftAllLeft(ndist).Or(x.ToBits().ShiftAllRight(dist)).BitsToInt16()
+func (x Uint16x8) RotateAllRight(shift uint64) (z Uint16x8) {
+	shift = shift & (16 - 1)
+	nshift := 16 - shift
+	return x.ShiftAllLeft(nshift).Or(x.ShiftAllRight(shift))
 }
 
-// RotateAllLeft rotates all elements left by the specified amount
+// RotateAllLeft rotates each element of x left by shift bits.
+//
+//	z[i] = rotateLeft(x[i], shift)
 //
 // Emulated
-func (x Int32x4) RotateAllLeft(dist uint64) Int32x4 {
-	dist = dist & (32 - 1)
-	ndist := 32 - dist
-	return x.ToBits().ShiftAllLeft(dist).Or(x.ToBits().ShiftAllRight(ndist)).BitsToInt32()
+func (x Uint32x4) RotateAllLeft(shift uint64) (z Uint32x4) {
+	shift = shift & (32 - 1)
+	nshift := 32 - shift
+	return x.ShiftAllLeft(shift).Or(x.ShiftAllRight(nshift))
 }
 
-// RotateAllRight rotates all elements right by the specified amount
+// RotateAllRight rotates each element of x right by shift bits.
+//
+//	z[i] = rotateRight(x[i], shift)
 //
 // Emulated
-func (x Int32x4) RotateAllRight(dist uint64) Int32x4 {
-	dist = dist & (32 - 1)
-	ndist := 32 - dist
-	return x.ToBits().ShiftAllLeft(ndist).Or(x.ToBits().ShiftAllRight(dist)).BitsToInt32()
+func (x Uint32x4) RotateAllRight(shift uint64) (z Uint32x4) {
+	shift = shift & (32 - 1)
+	nshift := 32 - shift
+	return x.ShiftAllLeft(nshift).Or(x.ShiftAllRight(shift))
 }
 
-// RotateAllLeft rotates all elements left by the specified amount
+// RotateAllLeft rotates each element of x left by shift bits.
+//
+//	z[i] = rotateLeft(x[i], shift)
 //
 // Emulated
-func (x Int64x2) RotateAllLeft(dist uint64) Int64x2 {
-	dist = dist & (64 - 1)
-	ndist := 64 - dist
-	return x.ToBits().ShiftAllLeft(dist).Or(x.ToBits().ShiftAllRight(ndist)).BitsToInt64()
+func (x Uint64x2) RotateAllLeft(shift uint64) (z Uint64x2) {
+	shift = shift & (64 - 1)
+	nshift := 64 - shift
+	return x.ShiftAllLeft(shift).Or(x.ShiftAllRight(nshift))
 }
 
-// RotateAllRight rotates all elements right by the specified amount
+// RotateAllRight rotates each element of x right by shift bits.
+//
+//	z[i] = rotateRight(x[i], shift)
 //
 // Emulated
-func (x Int64x2) RotateAllRight(dist uint64) Int64x2 {
-	dist = dist & (64 - 1)
-	ndist := 64 - dist
-	return x.ToBits().ShiftAllLeft(ndist).Or(x.ToBits().ShiftAllRight(dist)).BitsToInt64()
+func (x Uint64x2) RotateAllRight(shift uint64) (z Uint64x2) {
+	shift = shift & (64 - 1)
+	nshift := 64 - shift
+	return x.ShiftAllLeft(nshift).Or(x.ShiftAllRight(shift))
 }
 
-// RotateAllLeft rotates all elements left by the specified amount
+// ReduceSum returns the scalar sum of the elements of x.
 //
-// Emulated
-func (x Uint8x16) RotateAllLeft(dist uint64) Uint8x16 {
-	dist = dist & (8 - 1)
-	ndist := 8 - dist
-	return x.ShiftAllLeft(dist).Or(x.ShiftAllRight(ndist))
-}
-
-// RotateAllRight rotates all elements right by the specified amount
-//
-// Emulated
-func (x Uint8x16) RotateAllRight(dist uint64) Uint8x16 {
-	dist = dist & (8 - 1)
-	ndist := 8 - dist
-	return x.ShiftAllLeft(ndist).Or(x.ShiftAllRight(dist))
-}
-
-// RotateAllLeft rotates all elements left by the specified amount
-//
-// Emulated
-func (x Uint16x8) RotateAllLeft(dist uint64) Uint16x8 {
-	dist = dist & (16 - 1)
-	ndist := 16 - dist
-	return x.ShiftAllLeft(dist).Or(x.ShiftAllRight(ndist))
-}
-
-// RotateAllRight rotates all elements right by the specified amount
-//
-// Emulated
-func (x Uint16x8) RotateAllRight(dist uint64) Uint16x8 {
-	dist = dist & (16 - 1)
-	ndist := 16 - dist
-	return x.ShiftAllLeft(ndist).Or(x.ShiftAllRight(dist))
-}
-
-// RotateAllLeft rotates all elements left by the specified amount
-//
-// Emulated
-func (x Uint32x4) RotateAllLeft(dist uint64) Uint32x4 {
-	dist = dist & (32 - 1)
-	ndist := 32 - dist
-	return x.ShiftAllLeft(dist).Or(x.ShiftAllRight(ndist))
-}
-
-// RotateAllRight rotates all elements right by the specified amount
-//
-// Emulated
-func (x Uint32x4) RotateAllRight(dist uint64) Uint32x4 {
-	dist = dist & (32 - 1)
-	ndist := 32 - dist
-	return x.ShiftAllLeft(ndist).Or(x.ShiftAllRight(dist))
-}
-
-// RotateAllLeft rotates all elements left by the specified amount
-//
-// Emulated
-func (x Uint64x2) RotateAllLeft(dist uint64) Uint64x2 {
-	dist = dist & (64 - 1)
-	ndist := 64 - dist
-	return x.ShiftAllLeft(dist).Or(x.ShiftAllRight(ndist))
-}
-
-// RotateAllRight rotates all elements right by the specified amount
-//
-// Emulated
-func (x Uint64x2) RotateAllRight(dist uint64) Uint64x2 {
-	dist = dist & (64 - 1)
-	ndist := 64 - dist
-	return x.ShiftAllLeft(ndist).Or(x.ShiftAllRight(dist))
-}
-
-// ReduceSum reduces x by summing all elements.
+//	z = x[0] + x[1] + ...
 //
 // Emulated, CPU Feature: NEON
-func (x Int8x16) ReduceSum() int8 {
+func (x Int8x16) ReduceSum() (z int8) {
 	return x.reduceSum().GetElem(0)
 }
 
-// ReduceSum reduces x by summing all elements.
+// ReduceSum returns the scalar sum of the elements of x.
+//
+//	z = x[0] + x[1] + ...
 //
 // Emulated, CPU Feature: NEON
-func (x Int16x8) ReduceSum() int16 {
+func (x Int16x8) ReduceSum() (z int16) {
 	return x.reduceSum().GetElem(0)
 }
 
-// ReduceSum reduces x by summing all elements.
+// ReduceSum returns the scalar sum of the elements of x.
+//
+//	z = x[0] + x[1] + ...
 //
 // Emulated, CPU Feature: NEON
-func (x Int32x4) ReduceSum() int32 {
+func (x Int32x4) ReduceSum() (z int32) {
 	return x.reduceSum().GetElem(0)
 }
 
-// ReduceSum reduces x by summing all elements.
+// ReduceSum returns the scalar sum of the elements of x.
+//
+//	z = x[0] + x[1] + ...
 //
 // Emulated, CPU Feature: NEON
-func (x Uint8x16) ReduceSum() uint8 {
+func (x Uint8x16) ReduceSum() (z uint8) {
 	return x.reduceSum().GetElem(0)
 }
 
-// ReduceSum reduces x by summing all elements.
+// ReduceSum returns the scalar sum of the elements of x.
+//
+//	z = x[0] + x[1] + ...
 //
 // Emulated, CPU Feature: NEON
-func (x Uint16x8) ReduceSum() uint16 {
+func (x Uint16x8) ReduceSum() (z uint16) {
 	return x.reduceSum().GetElem(0)
 }
 
-// ReduceSum reduces x by summing all elements.
+// ReduceSum returns the scalar sum of the elements of x.
+//
+//	z = x[0] + x[1] + ...
 //
 // Emulated, CPU Feature: NEON
-func (x Uint32x4) ReduceSum() uint32 {
+func (x Uint32x4) ReduceSum() (z uint32) {
 	return x.reduceSum().GetElem(0)
 }
 

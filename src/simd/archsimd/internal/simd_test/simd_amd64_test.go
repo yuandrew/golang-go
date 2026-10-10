@@ -402,14 +402,14 @@ var ro uint64 = 2
 var roBig uint64 = 1024 + 2
 
 func TestRotateAllVariable(t *testing.T) {
-	got := make([]int32, 4)
-	archsimd.LoadInt32x4([]int32{0b11, 0b11, 0b11, 0b11}).RotateAllLeft(ro).Store(got)
+	got := make([]uint32, 4)
+	archsimd.LoadUint32x4([]uint32{0b11, 0b11, 0b11, 0b11}).RotateAllLeft(ro).Store(got)
 	for _, v := range got {
 		if v != 0b1100 {
 			t.Errorf("Want 0b1100, got %b", v)
 		}
 	}
-	archsimd.LoadInt32x4([]int32{0b11, 0b11, 0b11, 0b11}).RotateAllLeft(roBig).Store(got)
+	archsimd.LoadUint32x4([]uint32{0b11, 0b11, 0b11, 0b11}).RotateAllLeft(roBig).Store(got)
 	for _, v := range got {
 		if v != 0b1100 {
 			t.Errorf("Want 0b1100, got %b", v)
@@ -418,8 +418,8 @@ func TestRotateAllVariable(t *testing.T) {
 }
 
 func TestRotateAllConst(t *testing.T) {
-	got := make([]int32, 4)
-	archsimd.LoadInt32x4([]int32{0b11, 0b11, 0b11, 0b11}).RotateAllLeft(2).Store(got)
+	got := make([]uint32, 4)
+	archsimd.LoadUint32x4([]uint32{0b11, 0b11, 0b11, 0b11}).RotateAllLeft(2).Store(got)
 	for _, v := range got {
 		if v != 0b1100 {
 			t.Errorf("Want 0b1100, got %b", v)
@@ -1190,6 +1190,9 @@ func TestPermuteScalarsLoGrouped(t *testing.T) {
 }
 
 func TestClMul(t *testing.T) {
+	if !archsimd.X86.AVXPCLMULQDQ() {
+		t.Skip("Test requires X86.AVXPCLMULQDQ, not available on this hardware")
+	}
 	var x = archsimd.LoadUint64x2([]uint64{1, 5})
 	var y = archsimd.LoadUint64x2([]uint64{3, 9})
 
@@ -1207,16 +1210,26 @@ func TestClMul(t *testing.T) {
 
 }
 
-func addPairsSlice[T number](a, b []T) []T {
-	r := make([]T, len(a))
-	for i := range len(a) / 2 {
-		r[i] = a[2*i] + a[2*i+1]
-		r[i+len(a)/2] = b[2*i] + b[2*i+1]
+func TestClMul256(t *testing.T) {
+	if !archsimd.X86.VPCLMULQDQ() {
+		t.Skip("Test requires X86.VPCLMULQDQ, not available on this hardware")
 	}
-	return r
+	x := archsimd.LoadUint64x4([]uint64{1, 5, 1 << 63, 5})
+	y := archsimd.LoadUint64x4([]uint64{3, 9, 2, 9})
+
+	check := func(v archsimd.Uint64x4, want []uint64) {
+		t.Helper()
+		var got [4]uint64
+		v.Store(got[:])
+		checkSlices(t, got[:], want)
+	}
+	check(x.CarrylessMultiplyEven(y), []uint64{3, 0, 0, 1})
+	check(x.CarrylessMultiplyEvenOdd(y), []uint64{9, 0, 1 << 63, 4})
+	check(x.CarrylessMultiplyOddEven(y), []uint64{15, 0, 10, 0})
+	check(x.CarrylessMultiplyOdd(y), []uint64{45, 0, 45, 0})
 }
 
-func subPairsSlice[T number](a, b []T) []T {
+func concatSubPairsSlice[T number](a, b []T) []T {
 	r := make([]T, len(a))
 	for i := range len(a) / 2 {
 		r[i] = a[2*i] - a[2*i+1]
@@ -1229,7 +1242,7 @@ func addPairsGroupedSlice[T number](a, b []T) []T {
 	group := int(128 / unsafe.Sizeof(a[0]))
 	r := make([]T, 0, len(a))
 	for i := range len(a) / group {
-		r = append(r, addPairsSlice(a[i*group:(i+1)*group], b[i*group:(i+1)*group])...)
+		r = append(r, concatAddPairsSlice(a[i*group:(i+1)*group], b[i*group:(i+1)*group])...)
 	}
 	return r
 }
@@ -1238,24 +1251,24 @@ func subPairsGroupedSlice[T number](a, b []T) []T {
 	group := int(128 / unsafe.Sizeof(a[0]))
 	r := make([]T, 0, len(a))
 	for i := range len(a) / group {
-		r = append(r, subPairsSlice(a[i*group:(i+1)*group], b[i*group:(i+1)*group])...)
+		r = append(r, concatSubPairsSlice(a[i*group:(i+1)*group], b[i*group:(i+1)*group])...)
 	}
 	return r
 }
 
 func TestAddSubPairs(t *testing.T) {
-	testInt16x8Binary(t, archsimd.Int16x8.ConcatAddPairs, addPairsSlice[int16])
-	testInt16x8Binary(t, archsimd.Int16x8.ConcatSubPairs, subPairsSlice[int16])
-	testUint16x8Binary(t, archsimd.Uint16x8.ConcatAddPairs, addPairsSlice[uint16])
-	testUint16x8Binary(t, archsimd.Uint16x8.ConcatSubPairs, subPairsSlice[uint16])
-	testInt32x4Binary(t, archsimd.Int32x4.ConcatAddPairs, addPairsSlice[int32])
-	testInt32x4Binary(t, archsimd.Int32x4.ConcatSubPairs, subPairsSlice[int32])
-	testUint32x4Binary(t, archsimd.Uint32x4.ConcatAddPairs, addPairsSlice[uint32])
-	testUint32x4Binary(t, archsimd.Uint32x4.ConcatSubPairs, subPairsSlice[uint32])
-	testFloat32x4Binary(t, archsimd.Float32x4.ConcatAddPairs, addPairsSlice[float32])
-	testFloat32x4Binary(t, archsimd.Float32x4.ConcatSubPairs, subPairsSlice[float32])
-	testFloat64x2Binary(t, archsimd.Float64x2.ConcatAddPairs, addPairsSlice[float64])
-	testFloat64x2Binary(t, archsimd.Float64x2.ConcatSubPairs, subPairsSlice[float64])
+	testInt16x8Binary(t, archsimd.Int16x8.ConcatAddPairs, concatAddPairsSlice[int16])
+	testInt16x8Binary(t, archsimd.Int16x8.ConcatSubPairs, concatSubPairsSlice[int16])
+	testUint16x8Binary(t, archsimd.Uint16x8.ConcatAddPairs, concatAddPairsSlice[uint16])
+	testUint16x8Binary(t, archsimd.Uint16x8.ConcatSubPairs, concatSubPairsSlice[uint16])
+	testInt32x4Binary(t, archsimd.Int32x4.ConcatAddPairs, concatAddPairsSlice[int32])
+	testInt32x4Binary(t, archsimd.Int32x4.ConcatSubPairs, concatSubPairsSlice[int32])
+	testUint32x4Binary(t, archsimd.Uint32x4.ConcatAddPairs, concatAddPairsSlice[uint32])
+	testUint32x4Binary(t, archsimd.Uint32x4.ConcatSubPairs, concatSubPairsSlice[uint32])
+	testFloat32x4Binary(t, archsimd.Float32x4.ConcatAddPairs, concatAddPairsSlice[float32])
+	testFloat32x4Binary(t, archsimd.Float32x4.ConcatSubPairs, concatSubPairsSlice[float32])
+	testFloat64x2Binary(t, archsimd.Float64x2.ConcatAddPairs, concatAddPairsSlice[float64])
+	testFloat64x2Binary(t, archsimd.Float64x2.ConcatSubPairs, concatSubPairsSlice[float64])
 
 	// Grouped versions
 	if archsimd.X86.AVX2() {

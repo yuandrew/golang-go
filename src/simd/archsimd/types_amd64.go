@@ -18,18 +18,29 @@ type Float32x4 struct {
 // Len returns the number of elements in a Float32x4.
 func (x Float32x4) Len() int { return 4 }
 
-// LoadFloat32x4Array loads a Float32x4 from an array.
+// LoadFloat32x4Array loads an array into a vector.
 //
 //go:noescape
-func LoadFloat32x4Array(y *[4]float32) Float32x4
+func LoadFloat32x4Array(x *[4]float32) (z Float32x4)
 
-// StoreArray stores a Float32x4 to an array.
+// StoreArray stores the elements of x to an array.
 //
 //go:noescape
 func (x Float32x4) StoreArray(y *[4]float32)
 
-// StoreArrayMasked stores a Float32x4 to an array,
-// at those elements enabled by mask.
+// loadFloat32x4ArrayMasked loads a Float32x4 from an array,
+// at those elements enabled by mask, and zeroes the other elements.
+// The memory of the elements that are not enabled need not be
+// accessible: the load does not fault on it. The Part loads use this to
+// avoid reading past the end of a slice shorter than the vector.
+//
+// Asm: VMASKMOVD, CPU Feature: AVX2
+//
+//go:noescape
+func loadFloat32x4ArrayMasked(y *[4]float32, mask Mask32x4) Float32x4
+
+// StoreArrayMasked stores the masked elements of x to an array. It does not
+// modify elements of y that are false in the mask.
 //
 // Asm: VMASKMOVD, CPU Feature: AVX2
 //
@@ -45,18 +56,29 @@ type Float64x2 struct {
 // Len returns the number of elements in a Float64x2.
 func (x Float64x2) Len() int { return 2 }
 
-// LoadFloat64x2Array loads a Float64x2 from an array.
+// LoadFloat64x2Array loads an array into a vector.
 //
 //go:noescape
-func LoadFloat64x2Array(y *[2]float64) Float64x2
+func LoadFloat64x2Array(x *[2]float64) (z Float64x2)
 
-// StoreArray stores a Float64x2 to an array.
+// StoreArray stores the elements of x to an array.
 //
 //go:noescape
 func (x Float64x2) StoreArray(y *[2]float64)
 
-// StoreArrayMasked stores a Float64x2 to an array,
-// at those elements enabled by mask.
+// loadFloat64x2ArrayMasked loads a Float64x2 from an array,
+// at those elements enabled by mask, and zeroes the other elements.
+// The memory of the elements that are not enabled need not be
+// accessible: the load does not fault on it. The Part loads use this to
+// avoid reading past the end of a slice shorter than the vector.
+//
+// Asm: VMASKMOVQ, CPU Feature: AVX2
+//
+//go:noescape
+func loadFloat64x2ArrayMasked(y *[2]float64, mask Mask64x2) Float64x2
+
+// StoreArrayMasked stores the masked elements of x to an array. It does not
+// modify elements of y that are false in the mask.
 //
 // Asm: VMASKMOVQ, CPU Feature: AVX2
 //
@@ -72,12 +94,12 @@ type Int8x16 struct {
 // Len returns the number of elements in an Int8x16.
 func (x Int8x16) Len() int { return 16 }
 
-// LoadInt8x16Array loads an Int8x16 from an array.
+// LoadInt8x16Array loads an array into a vector.
 //
 //go:noescape
-func LoadInt8x16Array(y *[16]int8) Int8x16
+func LoadInt8x16Array(x *[16]int8) (z Int8x16)
 
-// StoreArray stores an Int8x16 to an array.
+// StoreArray stores the elements of x to an array.
 //
 //go:noescape
 func (x Int8x16) StoreArray(y *[16]int8)
@@ -91,12 +113,12 @@ type Int16x8 struct {
 // Len returns the number of elements in an Int16x8.
 func (x Int16x8) Len() int { return 8 }
 
-// LoadInt16x8Array loads an Int16x8 from an array.
+// LoadInt16x8Array loads an array into a vector.
 //
 //go:noescape
-func LoadInt16x8Array(y *[8]int16) Int16x8
+func LoadInt16x8Array(x *[8]int16) (z Int16x8)
 
-// StoreArray stores an Int16x8 to an array.
+// StoreArray stores the elements of x to an array.
 //
 //go:noescape
 func (x Int16x8) StoreArray(y *[8]int16)
@@ -110,18 +132,29 @@ type Int32x4 struct {
 // Len returns the number of elements in an Int32x4.
 func (x Int32x4) Len() int { return 4 }
 
-// LoadInt32x4Array loads an Int32x4 from an array.
+// LoadInt32x4Array loads an array into a vector.
 //
 //go:noescape
-func LoadInt32x4Array(y *[4]int32) Int32x4
+func LoadInt32x4Array(x *[4]int32) (z Int32x4)
 
-// StoreArray stores an Int32x4 to an array.
+// StoreArray stores the elements of x to an array.
 //
 //go:noescape
 func (x Int32x4) StoreArray(y *[4]int32)
 
-// StoreArrayMasked stores an Int32x4 to an array,
-// at those elements enabled by mask.
+// loadInt32x4ArrayMasked loads an Int32x4 from an array,
+// at those elements enabled by mask, and zeroes the other elements.
+// The memory of the elements that are not enabled need not be
+// accessible: the load does not fault on it. The Part loads use this to
+// avoid reading past the end of a slice shorter than the vector.
+//
+// Asm: VMASKMOVD, CPU Feature: AVX2
+//
+//go:noescape
+func loadInt32x4ArrayMasked(y *[4]int32, mask Mask32x4) Int32x4
+
+// StoreArrayMasked stores the masked elements of x to an array. It does not
+// modify elements of y that are false in the mask.
 //
 // Asm: VMASKMOVD, CPU Feature: AVX2
 //
@@ -137,18 +170,29 @@ type Int64x2 struct {
 // Len returns the number of elements in an Int64x2.
 func (x Int64x2) Len() int { return 2 }
 
-// LoadInt64x2Array loads an Int64x2 from an array.
+// LoadInt64x2Array loads an array into a vector.
 //
 //go:noescape
-func LoadInt64x2Array(y *[2]int64) Int64x2
+func LoadInt64x2Array(x *[2]int64) (z Int64x2)
 
-// StoreArray stores an Int64x2 to an array.
+// StoreArray stores the elements of x to an array.
 //
 //go:noescape
 func (x Int64x2) StoreArray(y *[2]int64)
 
-// StoreArrayMasked stores an Int64x2 to an array,
-// at those elements enabled by mask.
+// loadInt64x2ArrayMasked loads an Int64x2 from an array,
+// at those elements enabled by mask, and zeroes the other elements.
+// The memory of the elements that are not enabled need not be
+// accessible: the load does not fault on it. The Part loads use this to
+// avoid reading past the end of a slice shorter than the vector.
+//
+// Asm: VMASKMOVQ, CPU Feature: AVX2
+//
+//go:noescape
+func loadInt64x2ArrayMasked(y *[2]int64, mask Mask64x2) Int64x2
+
+// StoreArrayMasked stores the masked elements of x to an array. It does not
+// modify elements of y that are false in the mask.
 //
 // Asm: VMASKMOVQ, CPU Feature: AVX2
 //
@@ -164,12 +208,12 @@ type Uint8x16 struct {
 // Len returns the number of elements in a Uint8x16.
 func (x Uint8x16) Len() int { return 16 }
 
-// LoadUint8x16Array loads a Uint8x16 from an array.
+// LoadUint8x16Array loads an array into a vector.
 //
 //go:noescape
-func LoadUint8x16Array(y *[16]uint8) Uint8x16
+func LoadUint8x16Array(x *[16]uint8) (z Uint8x16)
 
-// StoreArray stores a Uint8x16 to an array.
+// StoreArray stores the elements of x to an array.
 //
 //go:noescape
 func (x Uint8x16) StoreArray(y *[16]uint8)
@@ -183,12 +227,12 @@ type Uint16x8 struct {
 // Len returns the number of elements in a Uint16x8.
 func (x Uint16x8) Len() int { return 8 }
 
-// LoadUint16x8Array loads a Uint16x8 from an array.
+// LoadUint16x8Array loads an array into a vector.
 //
 //go:noescape
-func LoadUint16x8Array(y *[8]uint16) Uint16x8
+func LoadUint16x8Array(x *[8]uint16) (z Uint16x8)
 
-// StoreArray stores a Uint16x8 to an array.
+// StoreArray stores the elements of x to an array.
 //
 //go:noescape
 func (x Uint16x8) StoreArray(y *[8]uint16)
@@ -202,18 +246,29 @@ type Uint32x4 struct {
 // Len returns the number of elements in a Uint32x4.
 func (x Uint32x4) Len() int { return 4 }
 
-// LoadUint32x4Array loads a Uint32x4 from an array.
+// LoadUint32x4Array loads an array into a vector.
 //
 //go:noescape
-func LoadUint32x4Array(y *[4]uint32) Uint32x4
+func LoadUint32x4Array(x *[4]uint32) (z Uint32x4)
 
-// StoreArray stores a Uint32x4 to an array.
+// StoreArray stores the elements of x to an array.
 //
 //go:noescape
 func (x Uint32x4) StoreArray(y *[4]uint32)
 
-// StoreArrayMasked stores a Uint32x4 to an array,
-// at those elements enabled by mask.
+// loadUint32x4ArrayMasked loads a Uint32x4 from an array,
+// at those elements enabled by mask, and zeroes the other elements.
+// The memory of the elements that are not enabled need not be
+// accessible: the load does not fault on it. The Part loads use this to
+// avoid reading past the end of a slice shorter than the vector.
+//
+// Asm: VMASKMOVD, CPU Feature: AVX2
+//
+//go:noescape
+func loadUint32x4ArrayMasked(y *[4]uint32, mask Mask32x4) Uint32x4
+
+// StoreArrayMasked stores the masked elements of x to an array. It does not
+// modify elements of y that are false in the mask.
 //
 // Asm: VMASKMOVD, CPU Feature: AVX2
 //
@@ -229,18 +284,29 @@ type Uint64x2 struct {
 // Len returns the number of elements in a Uint64x2.
 func (x Uint64x2) Len() int { return 2 }
 
-// LoadUint64x2Array loads a Uint64x2 from an array.
+// LoadUint64x2Array loads an array into a vector.
 //
 //go:noescape
-func LoadUint64x2Array(y *[2]uint64) Uint64x2
+func LoadUint64x2Array(x *[2]uint64) (z Uint64x2)
 
-// StoreArray stores a Uint64x2 to an array.
+// StoreArray stores the elements of x to an array.
 //
 //go:noescape
 func (x Uint64x2) StoreArray(y *[2]uint64)
 
-// StoreArrayMasked stores a Uint64x2 to an array,
-// at those elements enabled by mask.
+// loadUint64x2ArrayMasked loads a Uint64x2 from an array,
+// at those elements enabled by mask, and zeroes the other elements.
+// The memory of the elements that are not enabled need not be
+// accessible: the load does not fault on it. The Part loads use this to
+// avoid reading past the end of a slice shorter than the vector.
+//
+// Asm: VMASKMOVQ, CPU Feature: AVX2
+//
+//go:noescape
+func loadUint64x2ArrayMasked(y *[2]uint64, mask Mask64x2) Uint64x2
+
+// StoreArrayMasked stores the masked elements of x to an array. It does not
+// modify elements of y that are false in the mask.
 //
 // Asm: VMASKMOVQ, CPU Feature: AVX2
 //
@@ -253,15 +319,17 @@ type Mask8x16 struct {
 	vals    [16]int8
 }
 
-// Mask8x16FromBits constructs a Mask8x16 from a bitmap value, where 1 means set for the indexed element, 0 means unset.
+// Mask8x16FromBits returns bitmap x as a mask. If bit i of x is set, then mask
+// element i of the result is true.
 //
 // Asm: KMOVB, CPU Feature: AVX512
-func Mask8x16FromBits(y uint16) Mask8x16
+func Mask8x16FromBits(x uint16) (z Mask8x16)
 
-// ToBits constructs a bitmap from a Mask8x16, where 1 means set for the indexed element, 0 means unset.
+// ToBits returns x as a bitmap, where bit i is set if mask element i is
+// true.
 //
-// Asm: VPMOVMSKB, CPU Features: AVX
-func (x Mask8x16) ToBits() uint16
+// Asm: VPMOVMSKB, CPU Feature: AVX
+func (x Mask8x16) ToBits() (z uint16)
 
 // Mask16x8 is a mask for a SIMD vector of 8 16-bit elements.
 type Mask16x8 struct {
@@ -269,15 +337,17 @@ type Mask16x8 struct {
 	vals    [8]int16
 }
 
-// Mask16x8FromBits constructs a Mask16x8 from a bitmap value, where 1 means set for the indexed element, 0 means unset.
+// Mask16x8FromBits returns bitmap x as a mask. If bit i of x is set, then mask
+// element i of the result is true.
 //
 // Asm: KMOVW, CPU Feature: AVX512
-func Mask16x8FromBits(y uint8) Mask16x8
+func Mask16x8FromBits(x uint8) (z Mask16x8)
 
-// ToBits constructs a bitmap from a Mask16x8, where 1 means set for the indexed element, 0 means unset.
+// ToBits returns x as a bitmap, where bit i is set if mask element i is
+// true.
 //
-// Asm: KMOVW, CPU Features: AVX512
-func (x Mask16x8) ToBits() uint8
+// Asm: KMOVW, CPU Feature: AVX512
+func (x Mask16x8) ToBits() (z uint8)
 
 // Mask32x4 is a mask for a SIMD vector of 4 32-bit elements.
 type Mask32x4 struct {
@@ -285,17 +355,17 @@ type Mask32x4 struct {
 	vals    [4]int32
 }
 
-// Mask32x4FromBits constructs a Mask32x4 from a bitmap value, where 1 means set for the indexed element, 0 means unset.
-// Only the lower 4 bits of y are used.
+// Mask32x4FromBits returns bitmap x as a mask. If bit i of x is set, then mask
+// element i of the result is true.
 //
 // Asm: KMOVD, CPU Feature: AVX512
-func Mask32x4FromBits(y uint8) Mask32x4
+func Mask32x4FromBits(x uint8) (z Mask32x4)
 
-// ToBits constructs a bitmap from a Mask32x4, where 1 means set for the indexed element, 0 means unset.
-// Only the lower 4 bits of y are used.
+// ToBits returns x as a bitmap, where bit i is set if mask element i is
+// true.
 //
-// Asm: VMOVMSKPS, CPU Features: AVX
-func (x Mask32x4) ToBits() uint8
+// Asm: VMOVMSKPS, CPU Feature: AVX
+func (x Mask32x4) ToBits() (z uint8)
 
 // Mask64x2 is a mask for a SIMD vector of 2 64-bit elements.
 type Mask64x2 struct {
@@ -303,17 +373,17 @@ type Mask64x2 struct {
 	vals    [2]int64
 }
 
-// Mask64x2FromBits constructs a Mask64x2 from a bitmap value, where 1 means set for the indexed element, 0 means unset.
-// Only the lower 2 bits of y are used.
+// Mask64x2FromBits returns bitmap x as a mask. If bit i of x is set, then mask
+// element i of the result is true.
 //
 // Asm: KMOVQ, CPU Feature: AVX512
-func Mask64x2FromBits(y uint8) Mask64x2
+func Mask64x2FromBits(x uint8) (z Mask64x2)
 
-// ToBits constructs a bitmap from a Mask64x2, where 1 means set for the indexed element, 0 means unset.
-// Only the lower 2 bits of y are used.
+// ToBits returns x as a bitmap, where bit i is set if mask element i is
+// true.
 //
-// Asm: VMOVMSKPD, CPU Features: AVX
-func (x Mask64x2) ToBits() uint8
+// Asm: VMOVMSKPD, CPU Feature: AVX
+func (x Mask64x2) ToBits() (z uint8)
 
 // v256 is a tag type that tells the compiler that this is really 256-bit SIMD
 type v256 struct {
@@ -329,18 +399,29 @@ type Float32x8 struct {
 // Len returns the number of elements in a Float32x8.
 func (x Float32x8) Len() int { return 8 }
 
-// LoadFloat32x8Array loads a Float32x8 from an array.
+// LoadFloat32x8Array loads an array into a vector.
 //
 //go:noescape
-func LoadFloat32x8Array(y *[8]float32) Float32x8
+func LoadFloat32x8Array(x *[8]float32) (z Float32x8)
 
-// StoreArray stores a Float32x8 to an array.
+// StoreArray stores the elements of x to an array.
 //
 //go:noescape
 func (x Float32x8) StoreArray(y *[8]float32)
 
-// StoreArrayMasked stores a Float32x8 to an array,
-// at those elements enabled by mask.
+// loadFloat32x8ArrayMasked loads a Float32x8 from an array,
+// at those elements enabled by mask, and zeroes the other elements.
+// The memory of the elements that are not enabled need not be
+// accessible: the load does not fault on it. The Part loads use this to
+// avoid reading past the end of a slice shorter than the vector.
+//
+// Asm: VMASKMOVD, CPU Feature: AVX2
+//
+//go:noescape
+func loadFloat32x8ArrayMasked(y *[8]float32, mask Mask32x8) Float32x8
+
+// StoreArrayMasked stores the masked elements of x to an array. It does not
+// modify elements of y that are false in the mask.
 //
 // Asm: VMASKMOVD, CPU Feature: AVX2
 //
@@ -356,18 +437,29 @@ type Float64x4 struct {
 // Len returns the number of elements in a Float64x4.
 func (x Float64x4) Len() int { return 4 }
 
-// LoadFloat64x4Array loads a Float64x4 from an array.
+// LoadFloat64x4Array loads an array into a vector.
 //
 //go:noescape
-func LoadFloat64x4Array(y *[4]float64) Float64x4
+func LoadFloat64x4Array(x *[4]float64) (z Float64x4)
 
-// StoreArray stores a Float64x4 to an array.
+// StoreArray stores the elements of x to an array.
 //
 //go:noescape
 func (x Float64x4) StoreArray(y *[4]float64)
 
-// StoreArrayMasked stores a Float64x4 to an array,
-// at those elements enabled by mask.
+// loadFloat64x4ArrayMasked loads a Float64x4 from an array,
+// at those elements enabled by mask, and zeroes the other elements.
+// The memory of the elements that are not enabled need not be
+// accessible: the load does not fault on it. The Part loads use this to
+// avoid reading past the end of a slice shorter than the vector.
+//
+// Asm: VMASKMOVQ, CPU Feature: AVX2
+//
+//go:noescape
+func loadFloat64x4ArrayMasked(y *[4]float64, mask Mask64x4) Float64x4
+
+// StoreArrayMasked stores the masked elements of x to an array. It does not
+// modify elements of y that are false in the mask.
 //
 // Asm: VMASKMOVQ, CPU Feature: AVX2
 //
@@ -383,12 +475,12 @@ type Int8x32 struct {
 // Len returns the number of elements in an Int8x32.
 func (x Int8x32) Len() int { return 32 }
 
-// LoadInt8x32Array loads an Int8x32 from an array.
+// LoadInt8x32Array loads an array into a vector.
 //
 //go:noescape
-func LoadInt8x32Array(y *[32]int8) Int8x32
+func LoadInt8x32Array(x *[32]int8) (z Int8x32)
 
-// StoreArray stores an Int8x32 to an array.
+// StoreArray stores the elements of x to an array.
 //
 //go:noescape
 func (x Int8x32) StoreArray(y *[32]int8)
@@ -402,12 +494,12 @@ type Int16x16 struct {
 // Len returns the number of elements in an Int16x16.
 func (x Int16x16) Len() int { return 16 }
 
-// LoadInt16x16Array loads an Int16x16 from an array.
+// LoadInt16x16Array loads an array into a vector.
 //
 //go:noescape
-func LoadInt16x16Array(y *[16]int16) Int16x16
+func LoadInt16x16Array(x *[16]int16) (z Int16x16)
 
-// StoreArray stores an Int16x16 to an array.
+// StoreArray stores the elements of x to an array.
 //
 //go:noescape
 func (x Int16x16) StoreArray(y *[16]int16)
@@ -421,18 +513,29 @@ type Int32x8 struct {
 // Len returns the number of elements in an Int32x8.
 func (x Int32x8) Len() int { return 8 }
 
-// LoadInt32x8Array loads an Int32x8 from an array.
+// LoadInt32x8Array loads an array into a vector.
 //
 //go:noescape
-func LoadInt32x8Array(y *[8]int32) Int32x8
+func LoadInt32x8Array(x *[8]int32) (z Int32x8)
 
-// StoreArray stores an Int32x8 to an array.
+// StoreArray stores the elements of x to an array.
 //
 //go:noescape
 func (x Int32x8) StoreArray(y *[8]int32)
 
-// StoreArrayMasked stores an Int32x8 to an array,
-// at those elements enabled by mask.
+// loadInt32x8ArrayMasked loads an Int32x8 from an array,
+// at those elements enabled by mask, and zeroes the other elements.
+// The memory of the elements that are not enabled need not be
+// accessible: the load does not fault on it. The Part loads use this to
+// avoid reading past the end of a slice shorter than the vector.
+//
+// Asm: VMASKMOVD, CPU Feature: AVX2
+//
+//go:noescape
+func loadInt32x8ArrayMasked(y *[8]int32, mask Mask32x8) Int32x8
+
+// StoreArrayMasked stores the masked elements of x to an array. It does not
+// modify elements of y that are false in the mask.
 //
 // Asm: VMASKMOVD, CPU Feature: AVX2
 //
@@ -448,18 +551,29 @@ type Int64x4 struct {
 // Len returns the number of elements in an Int64x4.
 func (x Int64x4) Len() int { return 4 }
 
-// LoadInt64x4Array loads an Int64x4 from an array.
+// LoadInt64x4Array loads an array into a vector.
 //
 //go:noescape
-func LoadInt64x4Array(y *[4]int64) Int64x4
+func LoadInt64x4Array(x *[4]int64) (z Int64x4)
 
-// StoreArray stores an Int64x4 to an array.
+// StoreArray stores the elements of x to an array.
 //
 //go:noescape
 func (x Int64x4) StoreArray(y *[4]int64)
 
-// StoreArrayMasked stores an Int64x4 to an array,
-// at those elements enabled by mask.
+// loadInt64x4ArrayMasked loads an Int64x4 from an array,
+// at those elements enabled by mask, and zeroes the other elements.
+// The memory of the elements that are not enabled need not be
+// accessible: the load does not fault on it. The Part loads use this to
+// avoid reading past the end of a slice shorter than the vector.
+//
+// Asm: VMASKMOVQ, CPU Feature: AVX2
+//
+//go:noescape
+func loadInt64x4ArrayMasked(y *[4]int64, mask Mask64x4) Int64x4
+
+// StoreArrayMasked stores the masked elements of x to an array. It does not
+// modify elements of y that are false in the mask.
 //
 // Asm: VMASKMOVQ, CPU Feature: AVX2
 //
@@ -475,12 +589,12 @@ type Uint8x32 struct {
 // Len returns the number of elements in a Uint8x32.
 func (x Uint8x32) Len() int { return 32 }
 
-// LoadUint8x32Array loads a Uint8x32 from an array.
+// LoadUint8x32Array loads an array into a vector.
 //
 //go:noescape
-func LoadUint8x32Array(y *[32]uint8) Uint8x32
+func LoadUint8x32Array(x *[32]uint8) (z Uint8x32)
 
-// StoreArray stores a Uint8x32 to an array.
+// StoreArray stores the elements of x to an array.
 //
 //go:noescape
 func (x Uint8x32) StoreArray(y *[32]uint8)
@@ -494,12 +608,12 @@ type Uint16x16 struct {
 // Len returns the number of elements in a Uint16x16.
 func (x Uint16x16) Len() int { return 16 }
 
-// LoadUint16x16Array loads a Uint16x16 from an array.
+// LoadUint16x16Array loads an array into a vector.
 //
 //go:noescape
-func LoadUint16x16Array(y *[16]uint16) Uint16x16
+func LoadUint16x16Array(x *[16]uint16) (z Uint16x16)
 
-// StoreArray stores a Uint16x16 to an array.
+// StoreArray stores the elements of x to an array.
 //
 //go:noescape
 func (x Uint16x16) StoreArray(y *[16]uint16)
@@ -513,18 +627,29 @@ type Uint32x8 struct {
 // Len returns the number of elements in a Uint32x8.
 func (x Uint32x8) Len() int { return 8 }
 
-// LoadUint32x8Array loads a Uint32x8 from an array.
+// LoadUint32x8Array loads an array into a vector.
 //
 //go:noescape
-func LoadUint32x8Array(y *[8]uint32) Uint32x8
+func LoadUint32x8Array(x *[8]uint32) (z Uint32x8)
 
-// StoreArray stores a Uint32x8 to an array.
+// StoreArray stores the elements of x to an array.
 //
 //go:noescape
 func (x Uint32x8) StoreArray(y *[8]uint32)
 
-// StoreArrayMasked stores a Uint32x8 to an array,
-// at those elements enabled by mask.
+// loadUint32x8ArrayMasked loads a Uint32x8 from an array,
+// at those elements enabled by mask, and zeroes the other elements.
+// The memory of the elements that are not enabled need not be
+// accessible: the load does not fault on it. The Part loads use this to
+// avoid reading past the end of a slice shorter than the vector.
+//
+// Asm: VMASKMOVD, CPU Feature: AVX2
+//
+//go:noescape
+func loadUint32x8ArrayMasked(y *[8]uint32, mask Mask32x8) Uint32x8
+
+// StoreArrayMasked stores the masked elements of x to an array. It does not
+// modify elements of y that are false in the mask.
 //
 // Asm: VMASKMOVD, CPU Feature: AVX2
 //
@@ -540,18 +665,29 @@ type Uint64x4 struct {
 // Len returns the number of elements in a Uint64x4.
 func (x Uint64x4) Len() int { return 4 }
 
-// LoadUint64x4Array loads a Uint64x4 from an array.
+// LoadUint64x4Array loads an array into a vector.
 //
 //go:noescape
-func LoadUint64x4Array(y *[4]uint64) Uint64x4
+func LoadUint64x4Array(x *[4]uint64) (z Uint64x4)
 
-// StoreArray stores a Uint64x4 to an array.
+// StoreArray stores the elements of x to an array.
 //
 //go:noescape
 func (x Uint64x4) StoreArray(y *[4]uint64)
 
-// StoreArrayMasked stores a Uint64x4 to an array,
-// at those elements enabled by mask.
+// loadUint64x4ArrayMasked loads a Uint64x4 from an array,
+// at those elements enabled by mask, and zeroes the other elements.
+// The memory of the elements that are not enabled need not be
+// accessible: the load does not fault on it. The Part loads use this to
+// avoid reading past the end of a slice shorter than the vector.
+//
+// Asm: VMASKMOVQ, CPU Feature: AVX2
+//
+//go:noescape
+func loadUint64x4ArrayMasked(y *[4]uint64, mask Mask64x4) Uint64x4
+
+// StoreArrayMasked stores the masked elements of x to an array. It does not
+// modify elements of y that are false in the mask.
 //
 // Asm: VMASKMOVQ, CPU Feature: AVX2
 //
@@ -564,15 +700,17 @@ type Mask8x32 struct {
 	vals    [32]int8
 }
 
-// Mask8x32FromBits constructs a Mask8x32 from a bitmap value, where 1 means set for the indexed element, 0 means unset.
+// Mask8x32FromBits returns bitmap x as a mask. If bit i of x is set, then mask
+// element i of the result is true.
 //
 // Asm: KMOVB, CPU Feature: AVX512
-func Mask8x32FromBits(y uint32) Mask8x32
+func Mask8x32FromBits(x uint32) (z Mask8x32)
 
-// ToBits constructs a bitmap from a Mask8x32, where 1 means set for the indexed element, 0 means unset.
+// ToBits returns x as a bitmap, where bit i is set if mask element i is
+// true.
 //
-// Asm: VPMOVMSKB, CPU Features: AVX2
-func (x Mask8x32) ToBits() uint32
+// Asm: VPMOVMSKB, CPU Feature: AVX2
+func (x Mask8x32) ToBits() (z uint32)
 
 // Mask16x16 is a mask for a SIMD vector of 16 16-bit elements.
 type Mask16x16 struct {
@@ -580,15 +718,17 @@ type Mask16x16 struct {
 	vals     [16]int16
 }
 
-// Mask16x16FromBits constructs a Mask16x16 from a bitmap value, where 1 means set for the indexed element, 0 means unset.
+// Mask16x16FromBits returns bitmap x as a mask. If bit i of x is set, then mask
+// element i of the result is true.
 //
 // Asm: KMOVW, CPU Feature: AVX512
-func Mask16x16FromBits(y uint16) Mask16x16
+func Mask16x16FromBits(x uint16) (z Mask16x16)
 
-// ToBits constructs a bitmap from a Mask16x16, where 1 means set for the indexed element, 0 means unset.
+// ToBits returns x as a bitmap, where bit i is set if mask element i is
+// true.
 //
-// Asm: KMOVW, CPU Features: AVX512
-func (x Mask16x16) ToBits() uint16
+// Asm: KMOVW, CPU Feature: AVX512
+func (x Mask16x16) ToBits() (z uint16)
 
 // Mask32x8 is a mask for a SIMD vector of 8 32-bit elements.
 type Mask32x8 struct {
@@ -596,15 +736,17 @@ type Mask32x8 struct {
 	vals    [8]int32
 }
 
-// Mask32x8FromBits constructs a Mask32x8 from a bitmap value, where 1 means set for the indexed element, 0 means unset.
+// Mask32x8FromBits returns bitmap x as a mask. If bit i of x is set, then mask
+// element i of the result is true.
 //
 // Asm: KMOVD, CPU Feature: AVX512
-func Mask32x8FromBits(y uint8) Mask32x8
+func Mask32x8FromBits(x uint8) (z Mask32x8)
 
-// ToBits constructs a bitmap from a Mask32x8, where 1 means set for the indexed element, 0 means unset.
+// ToBits returns x as a bitmap, where bit i is set if mask element i is
+// true.
 //
-// Asm: VMOVMSKPS, CPU Features: AVX
-func (x Mask32x8) ToBits() uint8
+// Asm: VMOVMSKPS, CPU Feature: AVX
+func (x Mask32x8) ToBits() (z uint8)
 
 // Mask64x4 is a mask for a SIMD vector of 4 64-bit elements.
 type Mask64x4 struct {
@@ -612,17 +754,17 @@ type Mask64x4 struct {
 	vals    [4]int64
 }
 
-// Mask64x4FromBits constructs a Mask64x4 from a bitmap value, where 1 means set for the indexed element, 0 means unset.
-// Only the lower 4 bits of y are used.
+// Mask64x4FromBits returns bitmap x as a mask. If bit i of x is set, then mask
+// element i of the result is true.
 //
 // Asm: KMOVQ, CPU Feature: AVX512
-func Mask64x4FromBits(y uint8) Mask64x4
+func Mask64x4FromBits(x uint8) (z Mask64x4)
 
-// ToBits constructs a bitmap from a Mask64x4, where 1 means set for the indexed element, 0 means unset.
-// Only the lower 4 bits of y are used.
+// ToBits returns x as a bitmap, where bit i is set if mask element i is
+// true.
 //
-// Asm: VMOVMSKPD, CPU Features: AVX
-func (x Mask64x4) ToBits() uint8
+// Asm: VMOVMSKPD, CPU Feature: AVX
+func (x Mask64x4) ToBits() (z uint8)
 
 // v512 is a tag type that tells the compiler that this is really 512-bit SIMD
 type v512 struct {
@@ -638,18 +780,29 @@ type Float32x16 struct {
 // Len returns the number of elements in a Float32x16.
 func (x Float32x16) Len() int { return 16 }
 
-// LoadFloat32x16Array loads a Float32x16 from an array.
+// LoadFloat32x16Array loads an array into a vector.
 //
 //go:noescape
-func LoadFloat32x16Array(y *[16]float32) Float32x16
+func LoadFloat32x16Array(x *[16]float32) (z Float32x16)
 
-// StoreArray stores a Float32x16 to an array.
+// StoreArray stores the elements of x to an array.
 //
 //go:noescape
 func (x Float32x16) StoreArray(y *[16]float32)
 
-// StoreArrayMasked stores a Float32x16 to an array,
-// at those elements enabled by mask.
+// loadFloat32x16ArrayMasked loads a Float32x16 from an array,
+// at those elements enabled by mask, and zeroes the other elements.
+// The memory of the elements that are not enabled need not be
+// accessible: the load does not fault on it. The Part loads use this to
+// avoid reading past the end of a slice shorter than the vector.
+//
+// Asm: VMOVDQU32.Z, CPU Feature: AVX512
+//
+//go:noescape
+func loadFloat32x16ArrayMasked(y *[16]float32, mask Mask32x16) Float32x16
+
+// StoreArrayMasked stores the masked elements of x to an array. It does not
+// modify elements of y that are false in the mask.
 //
 // Asm: VMOVDQU32, CPU Feature: AVX512
 //
@@ -665,18 +818,29 @@ type Float64x8 struct {
 // Len returns the number of elements in a Float64x8.
 func (x Float64x8) Len() int { return 8 }
 
-// LoadFloat64x8Array loads a Float64x8 from an array.
+// LoadFloat64x8Array loads an array into a vector.
 //
 //go:noescape
-func LoadFloat64x8Array(y *[8]float64) Float64x8
+func LoadFloat64x8Array(x *[8]float64) (z Float64x8)
 
-// StoreArray stores a Float64x8 to an array.
+// StoreArray stores the elements of x to an array.
 //
 //go:noescape
 func (x Float64x8) StoreArray(y *[8]float64)
 
-// StoreArrayMasked stores a Float64x8 to an array,
-// at those elements enabled by mask.
+// loadFloat64x8ArrayMasked loads a Float64x8 from an array,
+// at those elements enabled by mask, and zeroes the other elements.
+// The memory of the elements that are not enabled need not be
+// accessible: the load does not fault on it. The Part loads use this to
+// avoid reading past the end of a slice shorter than the vector.
+//
+// Asm: VMOVDQU64.Z, CPU Feature: AVX512
+//
+//go:noescape
+func loadFloat64x8ArrayMasked(y *[8]float64, mask Mask64x8) Float64x8
+
+// StoreArrayMasked stores the masked elements of x to an array. It does not
+// modify elements of y that are false in the mask.
 //
 // Asm: VMOVDQU64, CPU Feature: AVX512
 //
@@ -692,18 +856,29 @@ type Int8x64 struct {
 // Len returns the number of elements in an Int8x64.
 func (x Int8x64) Len() int { return 64 }
 
-// LoadInt8x64Array loads an Int8x64 from an array.
+// LoadInt8x64Array loads an array into a vector.
 //
 //go:noescape
-func LoadInt8x64Array(y *[64]int8) Int8x64
+func LoadInt8x64Array(x *[64]int8) (z Int8x64)
 
-// StoreArray stores an Int8x64 to an array.
+// StoreArray stores the elements of x to an array.
 //
 //go:noescape
 func (x Int8x64) StoreArray(y *[64]int8)
 
-// StoreArrayMasked stores an Int8x64 to an array,
-// at those elements enabled by mask.
+// loadInt8x64ArrayMasked loads an Int8x64 from an array,
+// at those elements enabled by mask, and zeroes the other elements.
+// The memory of the elements that are not enabled need not be
+// accessible: the load does not fault on it. The Part loads use this to
+// avoid reading past the end of a slice shorter than the vector.
+//
+// Asm: VMOVDQU8.Z, CPU Feature: AVX512
+//
+//go:noescape
+func loadInt8x64ArrayMasked(y *[64]int8, mask Mask8x64) Int8x64
+
+// StoreArrayMasked stores the masked elements of x to an array. It does not
+// modify elements of y that are false in the mask.
 //
 // Asm: VMOVDQU8, CPU Feature: AVX512
 //
@@ -719,18 +894,29 @@ type Int16x32 struct {
 // Len returns the number of elements in an Int16x32.
 func (x Int16x32) Len() int { return 32 }
 
-// LoadInt16x32Array loads an Int16x32 from an array.
+// LoadInt16x32Array loads an array into a vector.
 //
 //go:noescape
-func LoadInt16x32Array(y *[32]int16) Int16x32
+func LoadInt16x32Array(x *[32]int16) (z Int16x32)
 
-// StoreArray stores an Int16x32 to an array.
+// StoreArray stores the elements of x to an array.
 //
 //go:noescape
 func (x Int16x32) StoreArray(y *[32]int16)
 
-// StoreArrayMasked stores an Int16x32 to an array,
-// at those elements enabled by mask.
+// loadInt16x32ArrayMasked loads an Int16x32 from an array,
+// at those elements enabled by mask, and zeroes the other elements.
+// The memory of the elements that are not enabled need not be
+// accessible: the load does not fault on it. The Part loads use this to
+// avoid reading past the end of a slice shorter than the vector.
+//
+// Asm: VMOVDQU16.Z, CPU Feature: AVX512
+//
+//go:noescape
+func loadInt16x32ArrayMasked(y *[32]int16, mask Mask16x32) Int16x32
+
+// StoreArrayMasked stores the masked elements of x to an array. It does not
+// modify elements of y that are false in the mask.
 //
 // Asm: VMOVDQU16, CPU Feature: AVX512
 //
@@ -746,18 +932,29 @@ type Int32x16 struct {
 // Len returns the number of elements in an Int32x16.
 func (x Int32x16) Len() int { return 16 }
 
-// LoadInt32x16Array loads an Int32x16 from an array.
+// LoadInt32x16Array loads an array into a vector.
 //
 //go:noescape
-func LoadInt32x16Array(y *[16]int32) Int32x16
+func LoadInt32x16Array(x *[16]int32) (z Int32x16)
 
-// StoreArray stores an Int32x16 to an array.
+// StoreArray stores the elements of x to an array.
 //
 //go:noescape
 func (x Int32x16) StoreArray(y *[16]int32)
 
-// StoreArrayMasked stores an Int32x16 to an array,
-// at those elements enabled by mask.
+// loadInt32x16ArrayMasked loads an Int32x16 from an array,
+// at those elements enabled by mask, and zeroes the other elements.
+// The memory of the elements that are not enabled need not be
+// accessible: the load does not fault on it. The Part loads use this to
+// avoid reading past the end of a slice shorter than the vector.
+//
+// Asm: VMOVDQU32.Z, CPU Feature: AVX512
+//
+//go:noescape
+func loadInt32x16ArrayMasked(y *[16]int32, mask Mask32x16) Int32x16
+
+// StoreArrayMasked stores the masked elements of x to an array. It does not
+// modify elements of y that are false in the mask.
 //
 // Asm: VMOVDQU32, CPU Feature: AVX512
 //
@@ -773,18 +970,29 @@ type Int64x8 struct {
 // Len returns the number of elements in an Int64x8.
 func (x Int64x8) Len() int { return 8 }
 
-// LoadInt64x8Array loads an Int64x8 from an array.
+// LoadInt64x8Array loads an array into a vector.
 //
 //go:noescape
-func LoadInt64x8Array(y *[8]int64) Int64x8
+func LoadInt64x8Array(x *[8]int64) (z Int64x8)
 
-// StoreArray stores an Int64x8 to an array.
+// StoreArray stores the elements of x to an array.
 //
 //go:noescape
 func (x Int64x8) StoreArray(y *[8]int64)
 
-// StoreArrayMasked stores an Int64x8 to an array,
-// at those elements enabled by mask.
+// loadInt64x8ArrayMasked loads an Int64x8 from an array,
+// at those elements enabled by mask, and zeroes the other elements.
+// The memory of the elements that are not enabled need not be
+// accessible: the load does not fault on it. The Part loads use this to
+// avoid reading past the end of a slice shorter than the vector.
+//
+// Asm: VMOVDQU64.Z, CPU Feature: AVX512
+//
+//go:noescape
+func loadInt64x8ArrayMasked(y *[8]int64, mask Mask64x8) Int64x8
+
+// StoreArrayMasked stores the masked elements of x to an array. It does not
+// modify elements of y that are false in the mask.
 //
 // Asm: VMOVDQU64, CPU Feature: AVX512
 //
@@ -800,18 +1008,29 @@ type Uint8x64 struct {
 // Len returns the number of elements in a Uint8x64.
 func (x Uint8x64) Len() int { return 64 }
 
-// LoadUint8x64Array loads a Uint8x64 from an array.
+// LoadUint8x64Array loads an array into a vector.
 //
 //go:noescape
-func LoadUint8x64Array(y *[64]uint8) Uint8x64
+func LoadUint8x64Array(x *[64]uint8) (z Uint8x64)
 
-// StoreArray stores a Uint8x64 to an array.
+// StoreArray stores the elements of x to an array.
 //
 //go:noescape
 func (x Uint8x64) StoreArray(y *[64]uint8)
 
-// StoreArrayMasked stores a Uint8x64 to an array,
-// at those elements enabled by mask.
+// loadUint8x64ArrayMasked loads a Uint8x64 from an array,
+// at those elements enabled by mask, and zeroes the other elements.
+// The memory of the elements that are not enabled need not be
+// accessible: the load does not fault on it. The Part loads use this to
+// avoid reading past the end of a slice shorter than the vector.
+//
+// Asm: VMOVDQU8.Z, CPU Feature: AVX512
+//
+//go:noescape
+func loadUint8x64ArrayMasked(y *[64]uint8, mask Mask8x64) Uint8x64
+
+// StoreArrayMasked stores the masked elements of x to an array. It does not
+// modify elements of y that are false in the mask.
 //
 // Asm: VMOVDQU8, CPU Feature: AVX512
 //
@@ -827,18 +1046,29 @@ type Uint16x32 struct {
 // Len returns the number of elements in a Uint16x32.
 func (x Uint16x32) Len() int { return 32 }
 
-// LoadUint16x32Array loads a Uint16x32 from an array.
+// LoadUint16x32Array loads an array into a vector.
 //
 //go:noescape
-func LoadUint16x32Array(y *[32]uint16) Uint16x32
+func LoadUint16x32Array(x *[32]uint16) (z Uint16x32)
 
-// StoreArray stores a Uint16x32 to an array.
+// StoreArray stores the elements of x to an array.
 //
 //go:noescape
 func (x Uint16x32) StoreArray(y *[32]uint16)
 
-// StoreArrayMasked stores a Uint16x32 to an array,
-// at those elements enabled by mask.
+// loadUint16x32ArrayMasked loads a Uint16x32 from an array,
+// at those elements enabled by mask, and zeroes the other elements.
+// The memory of the elements that are not enabled need not be
+// accessible: the load does not fault on it. The Part loads use this to
+// avoid reading past the end of a slice shorter than the vector.
+//
+// Asm: VMOVDQU16.Z, CPU Feature: AVX512
+//
+//go:noescape
+func loadUint16x32ArrayMasked(y *[32]uint16, mask Mask16x32) Uint16x32
+
+// StoreArrayMasked stores the masked elements of x to an array. It does not
+// modify elements of y that are false in the mask.
 //
 // Asm: VMOVDQU16, CPU Feature: AVX512
 //
@@ -854,18 +1084,29 @@ type Uint32x16 struct {
 // Len returns the number of elements in a Uint32x16.
 func (x Uint32x16) Len() int { return 16 }
 
-// LoadUint32x16Array loads a Uint32x16 from an array.
+// LoadUint32x16Array loads an array into a vector.
 //
 //go:noescape
-func LoadUint32x16Array(y *[16]uint32) Uint32x16
+func LoadUint32x16Array(x *[16]uint32) (z Uint32x16)
 
-// StoreArray stores a Uint32x16 to an array.
+// StoreArray stores the elements of x to an array.
 //
 //go:noescape
 func (x Uint32x16) StoreArray(y *[16]uint32)
 
-// StoreArrayMasked stores a Uint32x16 to an array,
-// at those elements enabled by mask.
+// loadUint32x16ArrayMasked loads a Uint32x16 from an array,
+// at those elements enabled by mask, and zeroes the other elements.
+// The memory of the elements that are not enabled need not be
+// accessible: the load does not fault on it. The Part loads use this to
+// avoid reading past the end of a slice shorter than the vector.
+//
+// Asm: VMOVDQU32.Z, CPU Feature: AVX512
+//
+//go:noescape
+func loadUint32x16ArrayMasked(y *[16]uint32, mask Mask32x16) Uint32x16
+
+// StoreArrayMasked stores the masked elements of x to an array. It does not
+// modify elements of y that are false in the mask.
 //
 // Asm: VMOVDQU32, CPU Feature: AVX512
 //
@@ -881,18 +1122,29 @@ type Uint64x8 struct {
 // Len returns the number of elements in a Uint64x8.
 func (x Uint64x8) Len() int { return 8 }
 
-// LoadUint64x8Array loads a Uint64x8 from an array.
+// LoadUint64x8Array loads an array into a vector.
 //
 //go:noescape
-func LoadUint64x8Array(y *[8]uint64) Uint64x8
+func LoadUint64x8Array(x *[8]uint64) (z Uint64x8)
 
-// StoreArray stores a Uint64x8 to an array.
+// StoreArray stores the elements of x to an array.
 //
 //go:noescape
 func (x Uint64x8) StoreArray(y *[8]uint64)
 
-// StoreArrayMasked stores a Uint64x8 to an array,
-// at those elements enabled by mask.
+// loadUint64x8ArrayMasked loads a Uint64x8 from an array,
+// at those elements enabled by mask, and zeroes the other elements.
+// The memory of the elements that are not enabled need not be
+// accessible: the load does not fault on it. The Part loads use this to
+// avoid reading past the end of a slice shorter than the vector.
+//
+// Asm: VMOVDQU64.Z, CPU Feature: AVX512
+//
+//go:noescape
+func loadUint64x8ArrayMasked(y *[8]uint64, mask Mask64x8) Uint64x8
+
+// StoreArrayMasked stores the masked elements of x to an array. It does not
+// modify elements of y that are false in the mask.
 //
 // Asm: VMOVDQU64, CPU Feature: AVX512
 //
@@ -905,15 +1157,17 @@ type Mask8x64 struct {
 	vals    [64]int8
 }
 
-// Mask8x64FromBits constructs a Mask8x64 from a bitmap value, where 1 means set for the indexed element, 0 means unset.
+// Mask8x64FromBits returns bitmap x as a mask. If bit i of x is set, then mask
+// element i of the result is true.
 //
 // Asm: KMOVB, CPU Feature: AVX512
-func Mask8x64FromBits(y uint64) Mask8x64
+func Mask8x64FromBits(x uint64) (z Mask8x64)
 
-// ToBits constructs a bitmap from a Mask8x64, where 1 means set for the indexed element, 0 means unset.
+// ToBits returns x as a bitmap, where bit i is set if mask element i is
+// true.
 //
-// Asm: KMOVB, CPU Features: AVX512
-func (x Mask8x64) ToBits() uint64
+// Asm: KMOVB, CPU Feature: AVX512
+func (x Mask8x64) ToBits() (z uint64)
 
 // Mask16x32 is a mask for a SIMD vector of 32 16-bit elements.
 type Mask16x32 struct {
@@ -921,15 +1175,17 @@ type Mask16x32 struct {
 	vals     [32]int16
 }
 
-// Mask16x32FromBits constructs a Mask16x32 from a bitmap value, where 1 means set for the indexed element, 0 means unset.
+// Mask16x32FromBits returns bitmap x as a mask. If bit i of x is set, then mask
+// element i of the result is true.
 //
 // Asm: KMOVW, CPU Feature: AVX512
-func Mask16x32FromBits(y uint32) Mask16x32
+func Mask16x32FromBits(x uint32) (z Mask16x32)
 
-// ToBits constructs a bitmap from a Mask16x32, where 1 means set for the indexed element, 0 means unset.
+// ToBits returns x as a bitmap, where bit i is set if mask element i is
+// true.
 //
-// Asm: KMOVW, CPU Features: AVX512
-func (x Mask16x32) ToBits() uint32
+// Asm: KMOVW, CPU Feature: AVX512
+func (x Mask16x32) ToBits() (z uint32)
 
 // Mask32x16 is a mask for a SIMD vector of 16 32-bit elements.
 type Mask32x16 struct {
@@ -937,15 +1193,17 @@ type Mask32x16 struct {
 	vals     [16]int32
 }
 
-// Mask32x16FromBits constructs a Mask32x16 from a bitmap value, where 1 means set for the indexed element, 0 means unset.
+// Mask32x16FromBits returns bitmap x as a mask. If bit i of x is set, then mask
+// element i of the result is true.
 //
 // Asm: KMOVD, CPU Feature: AVX512
-func Mask32x16FromBits(y uint16) Mask32x16
+func Mask32x16FromBits(x uint16) (z Mask32x16)
 
-// ToBits constructs a bitmap from a Mask32x16, where 1 means set for the indexed element, 0 means unset.
+// ToBits returns x as a bitmap, where bit i is set if mask element i is
+// true.
 //
-// Asm: KMOVD, CPU Features: AVX512
-func (x Mask32x16) ToBits() uint16
+// Asm: KMOVD, CPU Feature: AVX512
+func (x Mask32x16) ToBits() (z uint16)
 
 // Mask64x8 is a mask for a SIMD vector of 8 64-bit elements.
 type Mask64x8 struct {
@@ -953,12 +1211,14 @@ type Mask64x8 struct {
 	vals    [8]int64
 }
 
-// Mask64x8FromBits constructs a Mask64x8 from a bitmap value, where 1 means set for the indexed element, 0 means unset.
+// Mask64x8FromBits returns bitmap x as a mask. If bit i of x is set, then mask
+// element i of the result is true.
 //
 // Asm: KMOVQ, CPU Feature: AVX512
-func Mask64x8FromBits(y uint8) Mask64x8
+func Mask64x8FromBits(x uint8) (z Mask64x8)
 
-// ToBits constructs a bitmap from a Mask64x8, where 1 means set for the indexed element, 0 means unset.
+// ToBits returns x as a bitmap, where bit i is set if mask element i is
+// true.
 //
-// Asm: KMOVQ, CPU Features: AVX512
-func (x Mask64x8) ToBits() uint8
+// Asm: KMOVQ, CPU Feature: AVX512
+func (x Mask64x8) ToBits() (z uint8)

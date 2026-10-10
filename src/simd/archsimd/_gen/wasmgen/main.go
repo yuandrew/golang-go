@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 	"slices"
 	"strings"
 	"text/template"
@@ -16,13 +17,15 @@ import (
 
 	"simd/archsimd/_gen/gentools"
 	"simd/archsimd/_gen/sgutil"
+	"simd/archsimd/_gen/specdoc"
+	"simd/archsimd/_gen/specgen"
 )
 
 var (
 	genTypesFile      = flag.String("types", "simd/archsimd/types_wasm.go", "output file for simd types (e.g. types_wasm.go)")
 	genOpsFile        = flag.String("ops", "simd/archsimd/ops_wasm.go", "output file for simd ops (e.g. ops_wasm.go)")
 	genSSAOpsFile     = flag.String("ssaops", "cmd/compile/internal/ssa/_gen/simdWasmops.go", "output file for ssa ops (e.g. simdWasmops.go)")
-	genGenOpsFile     = flag.String("genops", "cmd/compile/internal/ssa/_gen/simdgenericOps.go", "output file for generic ssa ops (e.g. simdgenericOps.go)")
+	genGenOpsFile     = flag.String("genops", "cmd/compile/internal/ssa/_gen/simdWasmgenericOps_gen.go", "output file for generic ssa ops (e.g. simdWasmgenericOps_gen.go)")
 	genSSARulesFile   = flag.String("ssarules", "cmd/compile/internal/ssa/_gen/simdWasm.rules", "output file for ssa rules (e.g. simdWasm.rules)")
 	genWasmSSAFile    = flag.String("wasmssa", "cmd/compile/internal/wasm/simdssa.go", "output file for wasm ssa (e.g. simdssa.go)")
 	genIntrinsicsFile = flag.String("intrinsics", "cmd/compile/internal/ssagen/simdWasmintrinsics.go", "output file for intrinsics (e.g. simdWasmintrinsics.go)")
@@ -278,8 +281,8 @@ type wasmOp struct {
 	t          *simdType // the receiver and default arg type
 	op         string    // the basic Op type, e.g. "load", "add"
 	argCount   int       // Number of arguments (inputs)
-	argType    string    // (Binary) arg type (e.g., "v128", "i32", "void") -- defaults to t
-	resultType string    // Result type (e.g., "v128", "i32", "void") -- defaults to t
+	argType    string    // Go argument type (e.g. "Int32x4" for vector, or "int32" for lane replacement) -- defaults to t.Name
+	resultType string    // Go result type (e.g. "Uint32x4", or element type "int32" for lane extraction) -- defaults to t.Name
 	opFlags    OpFlags
 	doc        string
 
@@ -403,7 +406,7 @@ func (o *wasmOp) SsaResultType() string {
 
 func (o *wasmOp) RegInfo() string {
 	if o.argType == "" {
-		if o.resultType == "" {
+		if o.resultType == "" || (o.resultType[0] >= 'A' && o.resultType[0] <= 'Z') {
 			switch o.argCount {
 			case 1:
 				return "v11"
@@ -411,13 +414,6 @@ func (o *wasmOp) RegInfo() string {
 				return "v21"
 			case 3:
 				return "v31"
-			}
-		} else if o.Flag(IsConversion) {
-			if o.argCount == 1 {
-				return "v11"
-			} else if o.argCount == 2 {
-				// widening multiplies
-				return "v21"
 			}
 		} else {
 			if o.argCount == 1 {
@@ -633,7 +629,8 @@ var (
 
 	v_t = []string{"any_true"} // vector, test (scalar result)
 
-	s_1  = []string{"abs", "neg"}                                              // integer, unary
+	s_1  = []string{"neg"}                                                     // integer, unary
+	su_1 = []string{"abs"}                                                     // signed->unsigned integer, unary
 	f_1  = []string{"abs", "neg", "sqrt", "ceil", "floor", "trunc", "nearest"} // float, unary
 	i8_1 = []string{"popcnt"}                                                  // int8, unary
 
@@ -837,6 +834,11 @@ func initWasmOps() {
 		if strings.HasPrefix(s, "sub") || s == "div" {
 			return 0
 		}
+		if t.Float && (s == "min" || s == "max") {
+			// Generic Min/Max ops are shared with AMD64, where NaNs and
+			// signed zeros make these operations non-commutative.
+			return 0
+		}
 		return IsCommutative
 	}
 	isMask := func(s string, t *simdType) OpFlags {
@@ -871,6 +873,9 @@ func initWasmOps() {
 	addWasmOpsDetail(ints, v_3, 3, bitSelect)
 	addWasmOps(allTypes, v_t, 1, isTest)
 	addWasmOps(signed, s_1, 1, unShape)
+	addWasmOpsDetail(signed, su_1, 1, func(op *wasmOp) {
+		op.resultType = op.T().UintShaped.Name
+	})
 	addWasmOps(floats, f_1, 1, unShape)
 	addWasmOps([]*simdType{vi8}, i8_1, 1, nil)
 
@@ -898,7 +903,7 @@ func initWasmOps() {
 
 	// Shuffle is a mess, it takes a 8x16 vector in and SIXTEEN immediates specifying the indices.
 	// addWasmOps([]*simdType{vi8}, i8_shuf, 1, nil)
-	addWasmOpsDetail([]*simdType{vi8}, i8_swiz, 2, func(op *wasmOp) { op.arg1Name = "i" })
+	addWasmOpsDetail([]*simdType{vi8}, i8_swiz, 2, func(op *wasmOp) { op.arg1Name = "indices" })
 
 	// Masks have some operations.
 	addWasmOps(masks, iv_2, 2, isMask)
@@ -923,6 +928,7 @@ func initWasmOps() {
 	shift := func(op *wasmOp) {
 		op.argType = "uint64"
 		op.opFlags = IsShift
+		op.arg1Name = "shift"
 	}
 	addWasmOpsDetail(signed, s_s, 2, shift)
 	addWasmOpsDetail(unsigned, u_s, 2, shift)
@@ -995,7 +1001,7 @@ func initWasmOps() {
 	addWasmOpsDetail(sle32, s_q2, 2, mulHalf)
 	addWasmOpsDetail(ule32, u_q2, 2, mulHalf)
 
-	addWasmOpsDetail(ints, rotates, 2, rotate)
+	addWasmOpsDetail(unsigned, rotates, 2, rotate)
 
 	slices.SortFunc(wasmOps, compareWasmOps)
 
@@ -1066,7 +1072,18 @@ func main() {
 		return
 	}
 
+	specDir := specgen.MustFindSpecDir(genFlags.GOROOT)
+	specFuncs, err := specgen.Load(specDir, nil)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "loading spec: %v\n", err)
+		os.Exit(1)
+	}
+	specIdx := specgen.NewIndex(specFuncs)
+
 	var files gentools.Files
+	files.AddPostProcessor(specdoc.Filler(specIdx, specdoc.Options{
+		AllowDocRewrite: true,
+	}))
 	defer files.FlushOrExit()
 
 	genTypes(files.NewGoFile(*genTypesFile))
@@ -1086,7 +1103,7 @@ var loadDecl = templateOf("load from array", `
 // Load{{.Name}}Array loads {{.Article}} {{.Name}} from a [{{.Count}}]{{.Elem}}.
 //
 //go:noescape
-func Load{{.Name}}Array(y *[{{.Count}}]{{.Elem}}) {{.Name}}
+func Load{{.Name}}Array(x *[{{.Count}}]{{.Elem}}) {{.Name}}
 
 // Load{{.Name}} loads {{.Article}} {{.Name}} from a slice of at least {{.Count}} {{.Elem}}s.
 func Load{{.Name}}(s []{{.Elem}}) {{.Name}} {
@@ -1181,8 +1198,8 @@ var docForOp map[string]string = map[string]string{
 	"LessEqual":           " returns true if x is less than or equal to y, elementwise.",
 	"GreaterEqual":        " returns true if x is greater than or equal to y, elementwise.",
 	"MulAdd":              " returns the elementwise multiply-add of x, y, and z.",
-	"ShiftAllLeft":        " returns the elementwise left shift of x by y bits.",
-	"ShiftAllRight":       " returns the elementwise right shift of x by y bits.",
+	"ShiftAllLeft":        " returns the elementwise left shift of x by shift bits.",
+	"ShiftAllRight":       " returns the elementwise right shift of x by shift bits.",
 	"Ceil":                " returns the elementwise ceiling of x.",
 	"Floor":               " returns the elementwise floor of x.",
 	"Trunc":               " returns the elementwise truncation of x.",
@@ -1219,7 +1236,7 @@ var docForOp map[string]string = map[string]string{
 	"AddSaturated":       " returns the result of adding x and y, saturating instead of overflowing, elementwise.",
 	"SubSaturated":       " returns the result of subtracting x and y, saturating instead of overflowing, elementwise.",
 	"Shuffle":            " returns the elements of y concatenated with z that are selected by elements of x",
-	"LookupOrZero": ` returns the elements of x as indexed by the elements of i. If an index is out of range, its result is 0.
+	"LookupOrZero": ` returns the elements of x as indexed by the elements of indices. If an index is out of range, its result is 0.
 //
 //	if 0 <= indices[i] && indices[i] < len(table) {
 //	    result[i] = table[indices[i]]
@@ -1859,8 +1876,8 @@ func genGenerics(f *bytes.Buffer) {
 		newOps = append(newOps, newOp)
 	}
 
-	buf := sgutil.MergeSIMDGenericOps(newOps, genFlags.InputPath(*genGenOpsFile), "wasm")
-	f.Write(buf.Bytes())
+	fmt.Fprintf(f, "// Code generated by 'wasmgen'; DO NOT EDIT.\n\n")
+	sgutil.WriteSIMDGenericOps(f, newOps, "wasm")
 }
 
 // genIntrinsics creates the function that registers all of the WASM SIMD intrinsics.

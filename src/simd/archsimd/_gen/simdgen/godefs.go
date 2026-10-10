@@ -17,6 +17,8 @@ import (
 
 	"simd/archsimd/_gen/gentools"
 	"simd/archsimd/_gen/simdgen/types"
+	"simd/archsimd/_gen/specdoc"
+	"simd/archsimd/_gen/specgen"
 	"simd/archsimd/_gen/unify"
 )
 
@@ -423,6 +425,20 @@ func isInPlaceRegName(name string) bool {
 	return len(name) >= 3 && name[1] == 'd'
 }
 
+// sveAccumulatorInput reports whether op's first input is an accumulator: an
+// in-place destination like FMLA's <Zda> that the assembly names only once, as
+// opposed to a <Zdn> operand that is also named in a source position. The two
+// need different ssa-to-prog helpers — an accumulating instruction has one
+// more distinct register — so the accumulator gives the operation its own
+// register shape.
+func (op Operation) sveAccumulatorInput() bool {
+	if op.sveInPlaceInput() != 0 || op.In[0].RegName == nil {
+		return false
+	}
+	name := *op.In[0].RegName
+	return len(name) >= 3 && name[1] == 'd' && name[2] == 'a'
+}
+
 // sveInPlaceInput returns the index in op.In of the input naming the same
 // register as the destination — the operand a destructive instruction
 // overwrites — or -1 when the instruction is constructive.
@@ -730,7 +746,17 @@ func writeGoDefs(cl unify.Closure) error {
 	goTypeArch := archInfo.GoTypeArch
 	archLower := archInfo.Arch
 
+	specDir := specgen.MustFindSpecDir(genFlags.GOROOT)
+	specFuncs, err := specgen.Load(specDir, nil)
+	if err != nil {
+		return fmt.Errorf("loading spec: %w", err)
+	}
+	specIdx := specgen.NewIndex(specFuncs)
+
 	var files gentools.Files
+	files.AddPostProcessor(specdoc.Filler(specIdx, specdoc.Options{
+		AllowDocRewrite: true,
+	}))
 	defer files.FlushOrExit()
 
 	writeSIMDTypes(files.NewGoFile(simdPackage+"/types_"+goTypeArch+".go"), typeMap)
@@ -744,8 +770,7 @@ func writeGoDefs(cl unify.Closure) error {
 		deduped, typeMap, archLower == "amd64",
 	)
 	writeSIMDIntrinsics(files.NewGoFile("cmd/compile/internal/ssagen/simd"+simdTag+"intrinsics.go"), deduped, typeMap)
-	const simdGenericOpsFile = "cmd/compile/internal/ssa/_gen/simdgenericOps.go"
-	writeSIMDGenericOps(files.NewGoFile(simdGenericOpsFile), deduped, genFlags.InputPath(simdGenericOpsFile))
+	writeSIMDGenericOps(files.NewGoFile("cmd/compile/internal/ssa/_gen/simd"+simdTag+"genericOps_gen.go"), deduped)
 	writeSIMDMachineOps(files.NewGoFile("cmd/compile/internal/ssa/_gen/simd"+simdTag+"ops.go"), deduped)
 	writeSIMDSSA(files.NewGoFile("cmd/compile/internal/"+archLower+"/"+archInfo.ssaGenFile()), deduped)
 	writeSIMDRules(files.NewRawFile("cmd/compile/internal/ssa/_gen/simd"+simdTag+".rules"), deduped)

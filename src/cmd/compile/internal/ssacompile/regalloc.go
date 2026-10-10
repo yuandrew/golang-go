@@ -648,7 +648,7 @@ func (s *regAllocState) init(f *ssa.Func) {
 	}
 
 	// Figure out which registers we're allowed to use.
-	s.allocatable = s.f.Config.GpRegMask.Union(s.f.Config.FpRegMask).Union(s.f.Config.SpecialRegMask).Union(s.f.Config.SimdRegMask)
+	s.allocatable = s.f.Config.GpRegMask.Union(s.f.Config.FpRegMask).Union(s.f.Config.SpecialRegMask).Union(s.f.Config.SimdRegMask).Union(s.f.Config.SimdMaskReg)
 	s.allocatable = s.allocatable.RemoveReg(s.SPReg)
 	s.allocatable = s.allocatable.RemoveReg(s.SBReg)
 	if s.f.Config.HasGReg {
@@ -863,6 +863,7 @@ func (s *regAllocState) setState(regs []endReg) {
 }
 
 // compatRegs returns the set of registers which can store a type t.
+// It must never return Config.SpecialRegMask; see its documentation.
 func (s *regAllocState) compatRegs(t *types.Type) ssaop.RegMask {
 	var m ssaop.RegMask
 	if t.IsTuple() || t.IsFlags() {
@@ -872,10 +873,10 @@ func (s *regAllocState) compatRegs(t *types.Type) ssaop.RegMask {
 		if t.Size() > 8 {
 			return s.f.Config.SimdRegMask.Intersect(s.allocatable)
 		} else {
-			if !s.f.Config.SpecialRegMask.Empty() {
+			if !s.f.Config.SimdMaskReg.Empty() {
 				// P predicates
 				// No instructions can move P <-> GP.
-				return s.f.Config.SpecialRegMask.Intersect(s.allocatable)
+				return s.f.Config.SimdMaskReg.Intersect(s.allocatable)
 			}
 			// K mask
 			// We can move GP <-> K.
@@ -2538,16 +2539,21 @@ func (e *edgeState) reestablishSSA(exposedDownwards []contentRecord) {
 			}
 			downwardDef[d.Block.ID] = d
 		}
+		// collect iterated dominance frontier of all definitions
 		varDF.Clear()
-		pluckBlocks := func(yield func(*ssa.Block) bool) {
-			for _, d := range homed.defs {
-				if !yield(d.Block) {
-					return
+		if b := commonMergeBlock(sdom, homed.uses, homed.defs); b != nil {
+			varDF.Add(b.ID)
+		} else {
+			pluckBlocks := func(yield func(*ssa.Block) bool) {
+				for _, d := range homed.defs {
+					if !yield(d.Block) {
+						return
+					}
 				}
 			}
-		}
-		for d := range f.IterDomFrontierPlus(pluckBlocks) {
-			varDF.Add(d.ID)
+			for d := range f.IterDomFrontierPlus(pluckBlocks) {
+				varDF.Add(d.ID)
+			}
 		}
 		// We append to homed.uses, so we use C-style loops here
 		for i := 0; i < len(homed.uses); i++ {
@@ -2626,6 +2632,37 @@ func (e *edgeState) reestablishSSA(exposedDownwards []contentRecord) {
 			})
 		}
 	}
+}
+
+// commonMergeBlock returns the singular dominance frontier block for simple
+// cases. This avoids running the full dominance frontier algorithm over the CFG
+// when re-establishing SSA form. These simple cases are quite common at write
+// barriers and when paired with large map initialization, can bloat the runtime
+// of re-establish (see https://go.dev/issue/81663 )
+func commonMergeBlock(sdom ssa.SparseTree, uses []useSpec, defs []*ssa.Value) *ssa.Block {
+	if len(uses) != 1 {
+		return nil
+	}
+	use := uses[0]
+	if len(defs) != 2 {
+		return nil
+	}
+	b := use.block()
+	if len(b.Preds) != 2 {
+		return nil
+	}
+	x, y := b.Preds[0].B, b.Preds[1].B
+	// don't know if this is possible, but be conservative.
+	if x == y {
+		return nil
+	}
+	match := func(a, b *ssa.Block) bool {
+		return defs[0].Block == a && defs[1].Block == b
+	}
+	if match(x, y) || match(y, x) {
+		return b
+	}
+	return nil
 }
 
 // useSpec represents a use of a value. We represent it this way so that the
@@ -3046,13 +3083,15 @@ func (e *edgeState) set(loc ssa.Location, vid ssa.ID, c *ssa.Value, final bool, 
 		if len(a) == 1 {
 			e.uniqueRegs = e.uniqueRegs.AddReg(ssaop.Register(r.Num))
 		}
-		if len(a) == 2 {
-			if t, ok := e.s.f.GetHome(a[0].ID).(*ssabase.Register); ok {
-				e.uniqueRegs = e.uniqueRegs.RemoveReg(ssaop.Register(t.Num))
-			}
-		}
 		if e.s.values[vid].Rematerializeable {
 			e.rematerializeableRegs = e.rematerializeableRegs.AddReg(ssaop.Register(r.Num))
+		}
+	}
+	if len(a) == 2 {
+		// The first copy is no longer the only one, wherever the
+		// second one landed (a spill to a stack slot included).
+		if t, ok := e.s.f.GetHome(a[0].ID).(*ssabase.Register); ok {
+			e.uniqueRegs = e.uniqueRegs.RemoveReg(ssaop.Register(t.Num))
 		}
 	}
 	if e.s.f.Pass.Debug > ssa.RegDebug {
@@ -3104,6 +3143,7 @@ func (e *edgeState) erase(loc ssa.Location) {
 		if cr.final {
 			e.finalRegs = e.finalRegs.RemoveReg(ssaop.Register(r.Num))
 		}
+		e.uniqueRegs = e.uniqueRegs.RemoveReg(ssaop.Register(r.Num)) // it holds nothing now
 		e.rematerializeableRegs = e.rematerializeableRegs.RemoveReg(ssaop.Register(r.Num))
 	}
 	if len(a) == 1 {

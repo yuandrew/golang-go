@@ -8,7 +8,8 @@
   - &int
     go: $t
     base: int
-  - *int
+  - go: $t
+    name: shift
   out:
   - *int
 
@@ -19,28 +20,33 @@
   - &uint
     go: $t
     base: uint
-  - &uintAsInt
-    go: $t
+  - go: $t
     base: uint
     overwriteBase: int
+    name: shift
   out:
   - *uint
 
-- go: ShiftSaturated
+- go: ScaleSaturated
   signed: true
   asm: "VSQSHL"
   in:
   - *int
-  - *int
+  - go: $t
+    base: int
+    name: scale
   out:
   - *int
 
-- go: ShiftSaturated
+- go: ScaleSaturated
   signed: false
   asm: "VUQSHL"
   in:
   - *uint
-  - *uintAsInt
+  - go: $t
+    base: uint
+    overwriteBase: int
+    name: scale
   out:
   - *uint
 
@@ -128,6 +134,7 @@
     go: $t
     base: int
     treatLikeAScalarOfSize: 64
+    name: shift
   out:
   - *int
 
@@ -142,6 +149,7 @@
     base: uint
     treatLikeAScalarOfSize: 64
     overwriteBase: int
+    name: shift
   out:
   - *uint
 

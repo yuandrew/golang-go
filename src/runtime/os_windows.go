@@ -58,7 +58,6 @@ const (
 //go:cgo_import_dynamic runtime._SetWaitableTimer SetWaitableTimer%6 "kernel32.dll"
 //go:cgo_import_dynamic runtime._SuspendThread SuspendThread%1 "kernel32.dll"
 //go:cgo_import_dynamic runtime._SwitchToThread SwitchToThread%0 "kernel32.dll"
-//go:cgo_import_dynamic runtime._TlsAlloc TlsAlloc%0 "kernel32.dll"
 //go:cgo_import_dynamic runtime._VirtualAlloc VirtualAlloc%4 "kernel32.dll"
 //go:cgo_import_dynamic runtime._VirtualFree VirtualFree%3 "kernel32.dll"
 //go:cgo_import_dynamic runtime._VirtualQuery VirtualQuery%3 "kernel32.dll"
@@ -116,7 +115,6 @@ var (
 	_SetWaitableTimer,
 	_SuspendThread,
 	_SwitchToThread,
-	_TlsAlloc,
 	_VirtualAlloc,
 	_VirtualFree,
 	_VirtualQuery,
@@ -157,9 +155,6 @@ var (
 // to start new os thread.
 func tstart_stdcall(newm *m)
 
-// Init-time helper
-func wintls()
-
 type mOS struct {
 	// This is here to avoid using the G stack so the stack can move during the call.
 	stdCallInfo windows.StdCallInfo
@@ -173,29 +168,6 @@ type mOS struct {
 	highResTimer   uintptr // high resolution timer handle used in usleep
 	waitIocpTimer  uintptr // high resolution timer handle used in netpoll
 	waitIocpHandle uintptr // wait completion handle used in netpoll
-
-	// preemptExtLock synchronizes preemptM with entry/exit from
-	// external C code.
-	//
-	// This protects against races between preemptM calling
-	// SuspendThread and external code on this thread calling
-	// ExitProcess. If these happen concurrently, it's possible to
-	// exit the suspending thread and suspend the exiting thread,
-	// leading to deadlock.
-	//
-	// 0 indicates this M is not being preempted or in external
-	// code. Entering external code CASes this from 0 to 1. If
-	// this fails, a preemption is in progress, so the thread must
-	// wait for the preemption. preemptM also CASes this from 0 to
-	// 1. If this fails, the preemption fails (as it would if the
-	// PC weren't in Go code). The value is reset to 0 when
-	// returning from external code or after a preemption is
-	// complete.
-	//
-	// TODO(austin): We may not need this if preemption were more
-	// tightly synchronized on the G status and preemption
-	// blocked transition into _Gsyscall.
-	preemptExtLock uint32
 }
 
 // Stubs so tests can link correctly. These should never be called.
@@ -754,7 +726,13 @@ func semacreate(mp *m) {
 //
 //go:nowritebarrierrec
 func newosproc(mp *m) {
-	thandle, err := createThread(0, unsafe.Pointer(abi.FuncPCABI0(tstart_stdcall)), unsafe.Pointer(mp))
+	// LockOSThread can reach newosproc on a goroutine stack when starting
+	// the template thread. createThread does not switch stacks itself.
+	var thandle uintptr
+	var err uint32
+	systemstack(func() {
+		thandle, err = createThread(0, unsafe.Pointer(abi.FuncPCABI0(tstart_stdcall)), unsafe.Pointer(mp))
+	})
 	if thandle == 0 {
 		if atomic.Load(&exiting) != 0 {
 			// CreateThread may fail if called
@@ -770,6 +748,70 @@ func newosproc(mp *m) {
 
 	// Close thandle to avoid leaking the thread object if it exits.
 	stdcall(_CloseHandle, thandle)
+}
+
+// poll_runtime_startThread starts fn on a new OS thread, locked for the entire
+// lifetime of fn. The thread never runs another goroutine and exits when fn
+// returns. fn must not call UnlockOSThread.
+//
+// Unlike a Windows callback, this can run before package initialization has
+// finished. Unlike go followed by LockOSThread, it cannot acquire an existing
+// thread with outstanding I/O from an earlier goroutine.
+//
+//go:linkname poll_runtime_startThread internal/poll.runtime_startThread
+func poll_runtime_startThread(fn func()) {
+	// A locked worker may need the template thread to replace its M when it
+	// parks. Set this up before publishing a worker, as LockOSThread does.
+	if atomic.Load(&newmHandoff.haveTemplateThread) == 0 {
+		startTemplateThread()
+	}
+	gp := getg()
+	pc := sys.GetCallerPC()
+	systemstack(func() {
+		mp := acquirem()
+		worker := newproc1(*(**funcval)(unsafe.Pointer(&fn)), gp, pc, false, waitReasonZero)
+		// A shared worker must not retain its creator's profiling labels.
+		worker.labels = nil
+		thread := allocm(nil, pollStartThread, -1)
+		thread.syncIOWorker = true
+		thread.sigmask = initSigmask
+		thread.lockedExt = 1
+		thread.lockedg.set(worker)
+		worker.lockedm.set(thread)
+		newm1(thread)
+		releasem(mp)
+	})
+}
+
+// poll_runtime_threadHandle lends the current worker's thread handle to poll.
+// minit initialized it before the worker started. The worker is permanently
+// locked to its thread, so unminit cannot close the handle until it returns.
+//
+//go:linkname poll_runtime_threadHandle internal/poll.runtime_threadHandle
+//go:nosplit
+func poll_runtime_threadHandle() uintptr {
+	gp := getg()
+	if !gp.m.syncIOWorker || gp.lockedm.ptr() != gp.m {
+		throw("runtime: not a synchronous I/O worker")
+	}
+	return gp.m.thread
+}
+
+// pollStartThread starts without a P. Publish the locked goroutine and wait
+// for the scheduler to hand a P to this thread, as in stoplockedm.
+func pollStartThread() {
+	mp := getg().m
+	lock(&sched.lock)
+	// No checkdead is needed: this balances the increase in mcount from
+	// allocating this M, so there is no net decrease in running Ms.
+	sched.nmidlelocked++
+	globrunqput(mp.lockedg.ptr())
+	startm(nil, false, true)
+	unlock(&sched.lock)
+	mPark()
+	acquirep(mp.nextp.ptr())
+	mp.nextp = 0
+	execute(mp.lockedg.ptr(), false)
 }
 
 // Used by the C library build mode. On Linux this function would allocate a
@@ -1193,25 +1235,27 @@ var suspendLock mutex
 // themselves from acquiring new locks.
 const threadPausedLockRank = lockRankLeafRank
 
-func preemptM(mp *m) {
+// preemptM requests preemption of the M running gp.
+// gp.preempt must be set, and gp must be in _Gscanrunning, with its _Gscan
+// bit held by the caller.
+// preemptM releases the _Gscan bit before returning.
+func preemptM(gp *g) {
+	mp := gp.m
 	if mp == getg().m {
 		throw("self-preempt")
 	}
 
-	// Synchronize with external code that may try to ExitProcess.
-	if !atomic.Cas(&mp.preemptExtLock, 0, 1) {
-		// External code is running. Fail the preemption
-		// attempt.
-		mp.preemptGen.Add(1)
-		return
-	}
+	// Keep gp in _Gscanrunning so it can't enter _Gsyscall and external
+	// code before SuspendThread takes effect. External code may call
+	// ExitProcess, which can otherwise kill this thread before the target
+	// is suspended.
 
 	// Acquire our own handle to mp's thread.
 	lock(&mp.threadLock)
 	if mp.thread == 0 {
 		// The M hasn't been minit'd yet (or was just unminit'd).
 		unlock(&mp.threadLock)
-		atomic.Store(&mp.preemptExtLock, 0)
+		casfrom_Gscanstatus(gp, _Gscanrunning, _Grunning)
 		mp.preemptGen.Add(1)
 		return
 	}
@@ -1226,7 +1270,8 @@ func preemptM(mp *m) {
 	var c *windows.Context
 	var cbuf [unsafe.Sizeof(*c) + 15]byte
 	c = (*windows.Context)(unsafe.Pointer((uintptr(unsafe.Pointer(&cbuf[15]))) &^ 15))
-	c.ContextFlags = windows.CONTEXT_CONTROL
+	// CONTEXT_EXCEPTION_REQUEST reports whether the thread is in the kernel.
+	c.ContextFlags = windows.CONTEXT_CONTROL | windows.CONTEXT_EXCEPTION_REQUEST
 
 	// Serialize thread suspension. SuspendThread is asynchronous,
 	// so it's otherwise possible for two threads to suspend each
@@ -1242,11 +1287,11 @@ func preemptM(mp *m) {
 	if int32(stdcall(_SuspendThread, thread)) == -1 {
 		unlock(&suspendLock)
 		stdcall(_CloseHandle, thread)
-		atomic.Store(&mp.preemptExtLock, 0)
 		// The thread no longer exists. This shouldn't be
 		// possible, but just acknowledge the request.
 		mp.preemptGen.Add(1)
 		releaseLockRankAndM(threadPausedLockRank)
+		casfrom_Gscanstatus(gp, _Gscanrunning, _Grunning)
 		return
 	}
 
@@ -1263,9 +1308,15 @@ func preemptM(mp *m) {
 
 	unlock(&suspendLock)
 
-	// Does it want a preemption and is it safe to preempt?
-	gp := gFromSP(mp, c.SP())
-	if gp != nil && wantAsyncPreempt(gp) {
+	// Don't redirect a thread that is in the kernel handling an exception
+	// or system call; Windows may not apply the new context correctly
+	// (#79249). Without CONTEXT_EXCEPTION_REPORTING we can't tell.
+	safe := c.ContextFlags&windows.CONTEXT_EXCEPTION_REPORTING != 0 &&
+		c.ContextFlags&(windows.CONTEXT_EXCEPTION_ACTIVE|windows.CONTEXT_SERVICE_ACTIVE) == 0
+	c.ContextFlags = windows.CONTEXT_CONTROL
+
+	// Is it safe to preempt?
+	if safe && gFromSP(mp, c.SP()) == gp {
 		if ok, resumePC := isAsyncSafePoint(gp, c.PC(), c.SP(), c.LR()); ok {
 			// Inject call to asyncPreempt
 			targetPC := abi.FuncPCABI0(asyncPreempt)
@@ -1274,8 +1325,6 @@ func preemptM(mp *m) {
 		}
 	}
 
-	atomic.Store(&mp.preemptExtLock, 0)
-
 	// Acknowledge the preemption.
 	mp.preemptGen.Add(1)
 
@@ -1283,36 +1332,5 @@ func preemptM(mp *m) {
 	stdcall(_CloseHandle, thread)
 
 	releaseLockRankAndM(threadPausedLockRank)
-}
-
-// osPreemptExtEnter is called before entering external code that may
-// call ExitProcess.
-//
-// This must be nosplit because it may be called from a syscall with
-// untyped stack slots, so the stack must not be grown or scanned.
-//
-//go:nosplit
-func osPreemptExtEnter(mp *m) {
-	for !atomic.Cas(&mp.preemptExtLock, 0, 1) {
-		// An asynchronous preemption is in progress. It's not
-		// safe to enter external code because it may call
-		// ExitProcess and deadlock with SuspendThread.
-		// Ideally we would do the preemption ourselves, but
-		// can't since there may be untyped syscall arguments
-		// on the stack. Instead, just wait and encourage the
-		// SuspendThread APC to run. The preemption should be
-		// done shortly.
-		osyield()
-	}
-	// Asynchronous preemption is now blocked.
-}
-
-// osPreemptExtExit is called after returning from external code that
-// may call ExitProcess.
-//
-// See osPreemptExtEnter for why this is nosplit.
-//
-//go:nosplit
-func osPreemptExtExit(mp *m) {
-	atomic.Store(&mp.preemptExtLock, 0)
+	casfrom_Gscanstatus(gp, _Gscanrunning, _Grunning)
 }

@@ -33,7 +33,6 @@ var (
 	Export_writeStatusLine            = writeStatusLine
 	Export_is408Message               = is408Message
 	MaxPostCloseReadTime              = maxPostCloseReadTime
-	ProtocolSetHTTP3                  = protocolSetHTTP3
 )
 
 var MaxWriteWaitBeforeConnReuse = &maxWriteWaitBeforeConnReuse
@@ -61,8 +60,8 @@ func init() {
 }
 
 func CondSkipHTTP2(t testing.TB) {
-	if omitBundledHTTP2 {
-		t.Skip("skipping HTTP/2 test when nethttpomithttp2 build tag in use")
+	if omitHTTP2Server || omitHTTP2Client {
+		t.Skip("skipping HTTP/2 test when HTTP/2 server or client is omitted by build tag")
 	}
 }
 
@@ -291,9 +290,7 @@ func ResponseWriterConnForTesting(w ResponseWriter) (c net.Conn, ok bool) {
 
 func init() {
 	// Set the default rstAvoidanceDelay to the minimum possible value to shake
-	// out tests that unexpectedly depend on it. Such tests should use
-	// runTimeSensitiveTest and SetRSTAvoidanceDelay to explicitly raise the delay
-	// if needed.
+	// out tests that unexpectedly depend on it.
 	rstAvoidanceDelay = 1 * time.Nanosecond
 }
 
@@ -305,4 +302,9 @@ func SetRSTAvoidanceDelay(t *testing.T, d time.Duration) {
 		rstAvoidanceDelay = prevDelay
 	})
 	rstAvoidanceDelay = d
+}
+
+// SetHTTP3 adds or removes HTTP/3 from p.
+func (p *Protocols) SetHTTP3(ok bool) {
+	p.setHTTP3(ok)
 }

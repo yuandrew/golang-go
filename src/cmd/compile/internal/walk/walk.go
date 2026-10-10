@@ -23,7 +23,17 @@ const (
 	tmprunebufsize   = 32
 )
 
-type walkState struct{ curfunc *ir.Func }
+type walkState struct {
+	curfunc *ir.Func
+
+	// staticValues is a cache of static values for use by staticValue.
+	staticValues map[ir.Node]ir.Node
+
+	// shapeConvSources maps an *ir.Name (a PAUTO interface variable) to
+	// the shape type of the OCONVIFACE expression that is its single
+	// static value, if any.
+	shapeConvSources map[*ir.Name]*types.Type
+}
 
 // autoLabel generates a new Name node for use with
 // an automatically generated label.
@@ -31,8 +41,8 @@ type walkState struct{ curfunc *ir.Func }
 // to help with debugging.
 // It should begin with "." to avoid conflicts with
 // user labels.
-// This is a version of typecheck.AutoLabel that doesn't reference
-// ir.CurFunc so that we can remove references to ir.CurFunc from walk.
+// This is a version of typecheck.AutoLabel that takes the function
+// being walked from the walk state.
 func (w *walkState) autoLabel(prefix string) *types.Sym {
 	if prefix[0] != '.' {
 		base.Fatalf("autolabel prefix must start with '.', have %q", prefix)
@@ -46,10 +56,7 @@ func Walk(fn *ir.Func) {
 	walkstate := &walkState{curfunc: fn}
 
 	// Build pre-walk analysis caches with a single AST traversal.
-	// (At some point, it might be worthwhile to have a walkState structure
-	// that gets passed everywhere where things like this can go.)
-	analyzePreWalk(fn)
-	defer func() { staticValues = nil; shapeConvSources = nil }()
+	walkstate.analyzePreWalk(fn)
 
 	errorsBefore := base.Errors()
 	walkstate.order(fn)
@@ -129,7 +136,7 @@ func (w *walkState) vmkcall(fn ir.Node, t *types.Type, init *ir.Nodes, va []ir.N
 		base.Fatalf("vmkcall %v needs %v args got %v", fn, n, len(va))
 	}
 
-	call := typecheck.Call(base.Pos, fn, va, false).(*ir.CallExpr)
+	call := typecheck.Call(w.curfunc, base.Pos, fn, va, false).(*ir.CallExpr)
 	call.SetType(t)
 	return w.walkExpr(call, init).(*ir.CallExpr)
 }
@@ -283,7 +290,7 @@ func (w *walkState) walkAppendArgs(n *ir.CallExpr, init *ir.Nodes) {
 // appendWalkStmt typechecks and walks stmt and then appends it to init.
 func (w *walkState) appendWalkStmt(init *ir.Nodes, stmt ir.Node) {
 	op := stmt.Op()
-	n := typecheck.Stmt(stmt)
+	n := typecheck.Stmt(w.curfunc, stmt)
 	if op == ir.OAS || op == ir.OAS2 {
 		// If the assignment has side effects, walkExpr will append them
 		// directly to init for us, while walkStmt will wrap it in an OBLOCK.
@@ -462,33 +469,25 @@ func ifaceData(pos src.XPos, n ir.Node, t *types.Type) ir.Node {
 // staticValue returns the earliest expression it can find that always
 // evaluates to n, with similar semantics to [ir.StaticValue].
 //
-// It only returns results for the ir.CurFunc being processed in [Walk],
+// It only returns results for the function being processed in [Walk],
 // including its closures, and uses a cache to reduce duplicative work.
 // It can return n or nil if it does not find an earlier expression.
 //
 // The current use case is reducing OCONVIFACE allocations, and hence
 // staticValue is currently only useful when given an *ir.ConvExpr.X as n.
-func staticValue(n ir.Node) ir.Node {
-	if staticValues == nil {
+func (w *walkState) staticValue(n ir.Node) ir.Node {
+	if w.staticValues == nil {
 		base.Fatalf("staticValues is nil. staticValue called outside of walk.Walk?")
 	}
-	return staticValues[n]
+	return w.staticValues[n]
 }
-
-// staticValues is a cache of static values for use by staticValue.
-var staticValues map[ir.Node]ir.Node
-
-// shapeConvSources maps an *ir.Name (a PAUTO interface variable) to
-// the shape type of the OCONVIFACE expression that is its single
-// static value, if any.
-var shapeConvSources map[*ir.Name]*types.Type
 
 // analyzePreWalk populates staticValues and shapeConvSources using a
 // single AST traversal. We can't use an ir.ReassignOracle or
 // ir.StaticValue in the middle of walk because they don't currently
 // handle transformed assignments (e.g., will complain about
 // 'RHS == nil'). So we build these maps before walk begins.
-func analyzePreWalk(fn *ir.Func) {
+func (w *walkState) analyzePreWalk(fn *ir.Func) {
 	ro := &ir.ReassignOracle{}
 	ro.Init(fn)
 	sv := make(map[ir.Node]ir.Node)
@@ -518,7 +517,7 @@ func analyzePreWalk(fn *ir.Func) {
 			}
 		}
 	})
-	staticValues = sv
-	shapeConvSources = scs
+	w.staticValues = sv
+	w.shapeConvSources = scs
 	fn.NumPreWalkNodes = numNodes
 }

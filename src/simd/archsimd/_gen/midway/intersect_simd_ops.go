@@ -25,6 +25,8 @@ import (
 	"unicode/utf8"
 
 	"simd/archsimd/_gen/gentools"
+	"simd/archsimd/_gen/specdoc"
+	"simd/archsimd/_gen/specgen"
 
 	"gopkg.in/yaml.v3"
 )
@@ -97,6 +99,17 @@ func main() {
 	minorProblem := false
 
 	flag.Parse()
+
+	specDir := specgen.MustFindSpecDir(genFlags.GOROOT)
+	specFuncs, err := specgen.Load(specDir, nil)
+	if err != nil {
+		log.Fatalf("loading spec: %v", err)
+	}
+	specIdx := specgen.NewIndex(specFuncs)
+	files.AddPostProcessor(specdoc.Filler(specIdx, specdoc.Options{
+		AllowDocRewrite: true,
+	}))
+
 	defer files.FlushOrExit()
 
 	var comments Comments
@@ -124,15 +137,15 @@ func main() {
 	amd64Files := []string{"ops_amd64.go", "compare_gen_amd64.go", "types_amd64.go",
 		"other_gen_amd64.go", "extra_amd64.go", "maskmerge_gen_amd64.go",
 		"shuffles_amd64.go", "slice_gen_amd64.go", "slicepart_amd64.go",
-		"slicepart_128.go", "string.go", "ops_emulated_amd64.go"}
+		"slicepart_128.go", "string.go", "ops_emulated_amd64.go", "maskrange_amd64.go"}
 	wasmFiles := []string{"ops_wasm.go", "types_wasm.go", "slicepart_wasm.go",
-		"string.go", "slicepart_128.go", "ops_emulated_wasm.go"}
+		"string.go", "slicepart_128.go", "ops_emulated_wasm.go", "maskrange_128.go"}
 	neonFiles := []string{"clmul_arm64.go", "compare_gen_arm64.go",
 		"maskmerge_gen_arm64.go", "ops_arm64.go", "slicepart_128.go",
 		"ops_internal_arm64.go", "other_gen_arm64.go", "slice_gen_arm64.go",
-		"slicepart_arm64.go", "types_arm64.go", "ops_emulated_arm64.go"}
+		"slicepart_arm64.go", "types_arm64.go", "ops_emulated_arm64.go", "maskrange_128.go"}
 
-	emulatedFile := filepath.Join(genFlags.GOROOT, "src", "simd", "simd_emulated.go")
+	emulatedFile := genFlags.InputPath("simd/simd_emulated.go")
 
 	archAndFiles := []ArchAndFiles{
 		ArchAndFiles{"wasm", wasmFiles},
@@ -479,37 +492,30 @@ package simd
 
 `)
 
+		checkSpec := func(recv string, name string) {
+			if specIdx.Lookup(recv, name) == nil {
+				fullName := name
+				if recv != "" {
+					fullName = recv + "." + name
+
+				}
+				pw("Missing from spec: %s\n", fullName)
+			}
+		}
+
 		for _, elem := range elems {
 			intersection := intersectionByElem[elem]
 
 			if elem[0] != 'M' {
 				// cannot load masks
 
-				loadComment := comments.Functions["Load"+elem]
-				if loadComment == "" && comments.Functions["default_LoadSlice"] != "" {
-					loadComment = fmt.Sprintf(comments.Functions["default_LoadSlice"], elem, toScalar(elem), elem)
-				}
-				if loadComment != "" {
-					pf("// %s\n", loadComment)
-				}
+				checkSpec("", "Load"+elem+"s")
 				pf("func Load%ss([]%s) %ss\n", elem, toScalar(elem), elem)
 
-				loadPartComment := comments.Functions["Load"+elem+"Part"]
-				if loadPartComment == "" && comments.Functions["default_LoadPart"] != "" {
-					loadPartComment = fmt.Sprintf(comments.Functions["default_LoadPart"], elem, toScalar(elem), elem)
-				}
-				if loadPartComment != "" {
-					pf("// %s\n", loadPartComment)
-				}
+				checkSpec("", "Load"+elem+"sPart")
 				pf("func Load%ssPart([]%s) (%ss, int)\n", elem, toScalar(elem), elem)
 
-				broadcastComment := comments.Functions["Broadcast"+elem]
-				if broadcastComment == "" && comments.Functions["default_Broadcast"] != "" {
-					broadcastComment = fmt.Sprintf(comments.Functions["default_Broadcast"], elem)
-				}
-				if broadcastComment != "" {
-					pf("// %s\n", broadcastComment)
-				}
+				checkSpec("", "Broadcast"+elem+"s")
 				pf("func Broadcast%ss(%s) %ss\n", elem, toScalar(elem), elem)
 			}
 
@@ -523,7 +529,7 @@ package simd
 				if methodComment != "" {
 					pf("// %s\n", methodComment)
 				} else {
-					pw("Missing doc comment (in midway/comments.yaml) for %s.%s\n", elems, m)
+					checkSpec(elems, m)
 				}
 				pf("func (x %s) %s(", elems, m)
 
@@ -601,6 +607,38 @@ package simd
 		pw("%s contains %s.%s missing from intersected methods\n", emulatedFile, x.t, x.m)
 	}
 
+	twv := func(arch string) []typeWithVariants {
+		var typesForArch []typeWithVariants
+		for t := range knownReceivers {
+			if methodsByType[combine(arch, t)] != nil {
+				typesForArch = append(typesForArch, typeWithVariants{t, nil})
+			}
+		}
+		tfa0 := typesForArch
+		for _, tv := range tfa0 {
+			key := variants.Key{Arch: arch, Size: sizeForType[tv.t]}
+			if v := variants.Variants[key]; v != nil {
+				typesForArch = append(typesForArch, typeWithVariants{tv.t, v})
+			}
+		}
+		slices.SortFunc(typesForArch, func(a, b typeWithVariants) int {
+			if c := sgutil.CompareNatural(a.t, b.t); c != 0 {
+				return c
+			}
+			if a.v == nil && b.v == nil {
+				return 0
+			}
+			if a.v == nil && b.v != nil {
+				return -1
+			}
+			if a.v != nil && b.v == nil {
+				return 1
+			}
+			return sgutil.CompareNatural(a.v.Suffix, b.v.Suffix)
+		})
+		return typesForArch
+	}
+
 	for _, aaf := range archAndFiles {
 		arch := aaf.arch
 		// This is what writes the bridge.  The rewriter in the compiler will target these types.
@@ -619,34 +657,7 @@ package simd
 			pf("// also allows additional useful exported declarations that would weirdly pollute archsimd.\n")
 			pf("\n")
 
-			var typesForArch []typeWithVariants
-			for t := range knownReceivers {
-				if methodsByType[combine(arch, t)] != nil {
-					typesForArch = append(typesForArch, typeWithVariants{t, nil})
-				}
-			}
-			tfa0 := typesForArch
-			for _, tv := range tfa0 {
-				key := variants.Key{Arch: arch, Size: sizeForType[tv.t]}
-				if v := variants.Variants[key]; v != nil {
-					typesForArch = append(typesForArch, typeWithVariants{tv.t, v})
-				}
-			}
-			slices.SortFunc(typesForArch, func(a, b typeWithVariants) int {
-				if c := sgutil.CompareNatural(a.t, b.t); c != 0 {
-					return c
-				}
-				if a.v == nil && b.v == nil {
-					return 0
-				}
-				if a.v == nil && b.v != nil {
-					return -1
-				}
-				if a.v != nil && b.v == nil {
-					return 1
-				}
-				return sgutil.CompareNatural(a.v.Suffix, b.v.Suffix)
-			})
+			typesForArch := twv(arch)
 
 			for _, t := range typesForArch {
 				at := t.aName()
@@ -836,6 +847,14 @@ package simd
 
 				for _, t := range archTypes {
 					pf("\tcase archsimd.%s:\n", t)
+					key := variants.Key{Arch: arch, Size: sizeForType[t]}
+					if v := variants.Variants[key]; v != nil {
+						vt := v.Name(t)
+						pf("\t\tif !%s() {\n", v.DefaultRequires)
+						pf("\t\t\tvar t bridge.%s = bridge.%s(a)\n", vt, vt)
+						pf("\t\t\treturn (any(t)).(%ss)\n", elem)
+						pf("\t\t}\n")
+					}
 					pf("\t\tvar t bridge.%s = bridge.%s(a)\n", t, t)
 					pf("\t\treturn (any(t)).(%ss)\n", elem)
 				}
@@ -848,9 +867,37 @@ package simd
 	vw := files.NewGoFile("internal/simd/variants/variants.go")
 	vw.Write(variantBytes)
 
+	generateBridgeEmulated()
+
 	if minorProblem {
 		pw("The logged warnings did not prevent generation of the midway API files, but the API is flawed (lacks emulations, documentation, etc).\n")
 	}
+}
+
+// generatedBridgeEmulated generates internal/bridge/simd_emulated.go from
+// simd_emulated.go.
+func generateBridgeEmulated() {
+	b, err := genFlags.ReadFile("simd/simd_emulated.go")
+	if err != nil {
+		log.Fatalf("reading simd/simd_emulated.go: %v", err)
+	}
+	lines := strings.Split(string(b), "\n")
+	var sawBuild, sawPackage bool
+	for i, line := range lines {
+		if strings.HasPrefix(line, "//go:build ") && strings.Contains(line, "!(") && !sawBuild {
+			lines[i] = strings.Replace(line, "!(", "(", 1)
+			sawBuild = true
+		} else if strings.TrimSpace(line) == "package simd" && !sawPackage {
+			lines[i] = "package bridge"
+			sawPackage = true
+		}
+	}
+	if !sawBuild || !sawPackage {
+		log.Fatalf("transforming simd/simd_emulated.go: sawBuild=%v sawPackage=%v", sawBuild, sawPackage)
+	}
+	dst := files.NewGoFile("simd/internal/bridge/simd_emulated.go")
+	dst.WriteString("// Code generated by 'go run -C $GOROOT/src/simd/archsimd/_gen/midway'; DO NOT EDIT.\n\n")
+	dst.WriteString(strings.Join(lines, "\n"))
 }
 
 // Ensure that generating a set of variants writes out a consistent variants.go for the compiler's use
