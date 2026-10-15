@@ -28,7 +28,9 @@
 // unwinding and pauses its peers. Close discards paused owned channel, select,
 // nil-channel, and Sleep waits, plus queued runnable goroutines, without running
 // user defers. It rejects other live waits without modifying execution.
-// Close stops the world and scans all goroutines. Unsupported runtime operations,
+// Close inspects only the bubble's tracked goroutines and does not request a
+// process-wide disposal pause. Ordinary runtime pauses can still occur, and
+// StackTrace separately pauses the process. Unsupported runtime operations,
 // including blocking or yielding during Deliver, may still terminate the process.
 // An active CPU loop cannot be disposed of through Close.
 //
@@ -316,12 +318,10 @@ func publicState(r runtimebubble.State) State {
 // execution without running user defers. It rejects an active Step or unsupported
 // live waits without discarding any goroutines. Close is idempotent after success.
 //
-// When owned goroutines remain, Close stops the entire Go process while validating
-// their states and detaching supported waits. This also pauses unrelated
-// goroutines outside the bubble. Inspection scans the process's goroutine list;
-// pause duration depends on process and bubble size and has no guaranteed maximum.
-// A rejected disposal can also incur this pause. Closing a bubble with no
-// remaining goroutines does not require this disposal pause.
+// Close validates and detaches only this bubble's tracked goroutines, without
+// requesting a process-wide disposal pause. It may wait for stack scanning or
+// profiling coordination. Ordinary runtime pauses can still affect unrelated
+// goroutines, and Close has no guaranteed maximum latency.
 func (b *Bubble) Close() error {
 	if err := b.enter(); err != nil {
 		return err
@@ -340,8 +340,9 @@ func (b *Bubble) Close() error {
 	return nil
 }
 
-// StackTrace reports paused goroutines and their block reasons. If controller
-// validation fails, it returns the error text instead of a stack trace.
+// StackTrace reports paused goroutines and their block reasons. It pauses the
+// entire Go process during inspection, including unrelated goroutines. If
+// controller validation fails, it returns the error text instead of a stack trace.
 func (b *Bubble) StackTrace() string {
 	if err := b.enter(); err != nil {
 		return err.Error()

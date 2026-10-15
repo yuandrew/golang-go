@@ -4542,12 +4542,12 @@ func goexit0(gp *g) {
 	bubble := gp.bubble
 	if bubble != nil && bubble.deterministic != nil {
 		bubble.incActive()
+		bubble.deterministic.deterministicUntrack(gp)
 		deterministicRelease(gp, false)
 	}
 	gdestroy(gp)
 	if bubble != nil && bubble.deterministic != nil {
 		bubble.decActive()
-		bubble.deterministicFaultWake()
 	}
 	schedule()
 }
@@ -5376,8 +5376,29 @@ func malg(stacksize int32) *g {
 // The compiler turns a go statement into a call to this.
 func newproc(fn *funcval) {
 	gp := getg()
-	if gp.bubble != nil && gp.bubble.deterministic != nil && gp.bubble.deterministic.randomActive {
-		panic("runtime/bubble: random source must not start goroutines")
+	if b := gp.bubble; b != nil && b.deterministic != nil {
+		if b.deterministic.randomActive {
+			panic("runtime/bubble: random source must not start goroutines")
+		}
+		pc := sys.GetCallerPC()
+		var newg *g
+		systemstack(func() {
+			newg = newproc1(fn, gp, pc, false, waitReasonZero)
+		})
+		// Keep membership allocation on the executing goroutine's stack.
+		if newg.bubble == b {
+			b.deterministic.deterministicTrack(newg)
+		}
+		systemstack(func() {
+			if newg.bubble != nil && deterministicEnqueue(newg) {
+				return
+			}
+			runqput(getg().m.p.ptr(), newg, true)
+			if mainStarted {
+				wakep()
+			}
+		})
+		return
 	}
 	pc := sys.GetCallerPC()
 	systemstack(func() {

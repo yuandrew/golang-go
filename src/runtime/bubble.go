@@ -15,6 +15,7 @@ import (
 // The ordinary scheduler sees only the logical owner. Other runnable goroutines
 // remain _Grunnable (and visible to GC) in runq, not in a P or global run queue.
 type deterministicBubble struct {
+	members      []*g           // live owned goroutines; exclusive logical execution
 	activation   byte           // host-to-user race edge, separate from quiescence collection
 	owner        atomic.Uintptr // *g, read without bubble.mu by GC-assist wakeups
 	runq         gQueue         // protected by bubble.mu; no write barriers
@@ -31,6 +32,50 @@ type deterministicBubble struct {
 	randomActive bool
 	legacyRandom any // *math/rand.Rand, including its independent Read buffer
 	timers       deterministicTimers
+}
+
+const maxBubbleSlot = ^uint16(0)
+
+// Small indices fit g's existing padding; larger executions retain search fallback.
+func (d *deterministicBubble) deterministicTrack(gp *g) {
+	if gp.bubbleSlot != 0 {
+		throw("runtime/bubble: invalid member registration")
+	}
+	d.members = append(d.members, gp)
+	deterministicSetSlot(gp, len(d.members))
+}
+
+func deterministicSetSlot(gp *g, slot int) {
+	gp.bubbleSlot = 0
+	if slot <= int(maxBubbleSlot) {
+		gp.bubbleSlot = uint16(slot)
+	}
+}
+
+func (d *deterministicBubble) deterministicUntrack(gp *g) {
+	index := int(gp.bubbleSlot) - 1
+	if index < 0 {
+		// Overflow is a performance fallback, not a concurrency limit.
+		for i, member := range d.members {
+			if member == gp {
+				index = i
+				break
+			}
+		}
+		if index < 0 {
+			return
+		}
+	}
+	last := len(d.members) - 1
+	if index > last || d.members[index] != gp {
+		throw("runtime/bubble: invalid member index")
+	}
+	moved := d.members[last]
+	d.members[index] = moved
+	deterministicSetSlot(moved, index+1)
+	d.members[last] = nil
+	d.members = d.members[:last]
+	gp.bubbleSlot = 0
 }
 
 // deterministicEnqueue reports whether gp was withheld from the normal scheduler.
@@ -91,7 +136,8 @@ func (b *synctestBubble) deterministicFaultWake() {
 	d := b.deterministic
 	lock(&b.mu)
 	var controller *g
-	if d.failure != "" && !d.disposing && d.waiting {
+	// Return faults only after logical execution and runtime teardown stop.
+	if d.owner.Load() == 0 && b.active == 0 && d.failure != "" && !d.disposing && d.waiting {
 		d.waiting = false
 		controller = b.root
 	}
@@ -203,6 +249,7 @@ func deterministicStep(handle any, now int64, deliver func()) (state bubbleapi.S
 				throw("runtime/bubble: root escaped paused activation")
 			}
 		})
+		d.deterministicTrack(b.main)
 	}
 	if deliver != nil {
 		d.delivering = true
@@ -259,6 +306,7 @@ func deterministicClose(handle any) bool {
 		return false
 	}
 	d.closed = true
+	d.members = nil
 	d.f = nil
 	d.timers = deterministicTimers{}
 	d.randomSource = nil
@@ -270,30 +318,41 @@ func deterministicClose(handle any) bool {
 // Preflight all waits before detaching any; unsupported states remain usable.
 func (b *synctestBubble) deterministicDispose() bool {
 	d := b.deterministic
-	stw := stopTheWorld(stwAllGoroutinesStack)
-	for _, gp := range allGsSnapshot() {
-		if gp.bubble != b {
-			continue
-		}
-		status := readgstatus(gp)
-		if status == _Grunnable {
-			if gp.sched.lr != 0 && gp.sched.pc != gp.startpc {
-				startTheWorld(stw)
-				return false
-			}
-			continue
-		}
-		if status != _Gwaiting || !deterministicDisposable(gp) {
-			startTheWorld(stw)
-			return false
-		}
-		for sg := gp.waiting; sg != nil; sg = sg.waitlink {
-			if sg.c.get() == nil || sg.c.get().bubble != b {
-				startTheWorld(stw)
-				return false
-			}
-		}
+	lock(&b.mu)
+	stable := !d.stepping && d.owner.Load() == 0 && b.active == 0 && len(d.members) == b.total
+	unlock(&b.mu)
+	if !stable {
+		return false
 	}
+	members := d.members
+
+	// Claim one paused stack at a time; rejection must precede mutation.
+	valid := true
+	systemstack(func() {
+		for _, gp := range members {
+			status := deterministicLock(gp)
+			if status == 0 {
+				valid = false
+				break
+			}
+			if status == _Grunnable {
+				valid = gp.sched.lr == 0 || gp.sched.pc == gp.startpc
+			} else {
+				valid = deterministicDisposable(gp)
+				for sg := gp.waiting; valid && sg != nil; sg = sg.waitlink {
+					valid = sg.c.get() != nil && sg.c.get().bubble == b
+				}
+			}
+			casfrom_Gscanstatus(gp, status|_Gscan, status)
+			if !valid {
+				break
+			}
+		}
+	})
+	if !valid {
+		return false
+	}
+
 	d.disposing = true
 	for _, entry := range d.timers.registered {
 		reg := entry.timer
@@ -301,34 +360,88 @@ func (b *synctestBubble) deterministicDispose() bool {
 			continue
 		}
 		if reg.timer != nil {
+			reg.timer.lock()
 			reg.timer.when = 0
+			reg.timer.unlock()
 		}
 		reg.armed = false
 		reg.timer = nil
 	}
 	f := deterministicExit
 	fv := *(**funcval)(unsafe.Pointer(&f))
-	for _, gp := range allGsSnapshot() {
-		if gp.bubble != b {
-			continue
+	for _, gp := range members {
+		var status uint32
+		var waiting *sudog
+		systemstack(func() {
+			status = deterministicLock(gp)
+			if status == 0 {
+				throw("runtime/bubble: paused member changed state")
+			}
+			waiting = gp.waiting
+			casfrom_Gscanstatus(gp, status|_Gscan, status)
+		})
+		// GC adjusts only element pointers; wait links remain stable while paused.
+		deterministicUnlink(waiting)
+		systemstack(func() {
+			// Record the original stack before mutation. Staying on g0 prevents
+			// a new profiling generation between this check and the rewrite.
+			if goroutineProfile.active {
+				tryRecordGoroutineProfile(gp, nil, osyield)
+			}
+			status = deterministicLock(gp)
+			if status == 0 {
+				throw("runtime/bubble: detached member changed state")
+			}
+			for sg := waiting; sg != nil; sg = sg.waitlink {
+				sg.elem.set(nil)
+			}
+			gp.waiting = nil
+			gp.activeStackChans = false
+			gp.selectDone.Store(0)
+			gp.param = nil
+			// Keep original frames valid for GC until ordinary exit teardown.
+			if gp.sched.lr != 0 {
+				gp.sched.pc = fv.fn
+				gp.sched.ctxt = unsafe.Pointer(fv)
+			} else {
+				gostartcallfn(&gp.sched, fv)
+			}
+			casfrom_Gscanstatus(gp, status|_Gscan, status)
+		})
+		// Pool locks must be acquired after scan ownership is released.
+		for sg := waiting; sg != nil; {
+			next := sg.waitlink
+			sg.c.set(nil)
+			sg.isSelect = false
+			sg.waitlink = nil
+			releaseSudog(sg)
+			sg = next
 		}
-		deterministicUnlink(gp)
-		// Insert a runtime-only exit frame; existing stack frames remain valid
-		// for GC until normal scheduler teardown destroys this goroutine.
-		if gp.sched.lr != 0 {
-			// A never-started goroutine already has its goexit return frame.
-			gp.sched.pc = fv.fn
-			gp.sched.ctxt = unsafe.Pointer(fv)
-		} else {
-			gostartcallfn(&gp.sched, fv)
-		}
-		if readgstatus(gp) == _Gwaiting {
+		if status == _Gwaiting {
 			goready(gp, 0)
 		}
 	}
-	startTheWorld(stw)
+
 	deterministicStep(b, b.now, nil)
 	return b.total == 0
+}
+
+// deterministicLock owns a paused stack against GC and tracing transitions.
+// Unlike suspendG, this is an explicit exclusive claim, with no running preemption.
+func deterministicLock(gp *g) uint32 {
+	for {
+		status := readgstatus(gp)
+		if status&_Gscan != 0 {
+			osyield()
+			continue
+		}
+		if status != _Gwaiting && status != _Grunnable {
+			return 0
+		}
+		if castogscanstatus(gp, status, status|_Gscan) {
+			return status
+		}
+	}
 }
 
 func deterministicDisposable(gp *g) bool {
@@ -341,11 +454,10 @@ func deterministicDisposable(gp *g) bool {
 	return false
 }
 
-// deterministicUnlink removes owned channel registrations before stack disposal.
-// The world is stopped; channel locks also preserve stack-copying invariants.
-func deterministicUnlink(gp *g) {
-	for sg := gp.waiting; sg != nil; {
-		next := sg.waitlink
+// deterministicUnlink changes channel queues without holding a stack scan lock.
+// Paused ownership excludes wakeups; GC can still adjust each element pointer.
+func deterministicUnlink(waiting *sudog) {
+	for sg := waiting; sg != nil; sg = sg.waitlink {
 		c := sg.c.get()
 		lock(&c.lock)
 		found := false
@@ -363,17 +475,7 @@ func deterministicUnlink(gp *g) {
 			unblockTimerChan(c)
 		}
 		unlock(&c.lock)
-		sg.elem.set(nil)
-		sg.c.set(nil)
-		sg.isSelect = false
-		sg.waitlink = nil
-		releaseSudog(sg)
-		sg = next
 	}
-	gp.waiting = nil
-	gp.activeStackChans = false
-	gp.selectDone.Store(0)
-	gp.param = nil
 }
 
 func deterministicExit() {

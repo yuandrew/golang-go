@@ -126,6 +126,8 @@ func (bubble *synctestBubble) decActive() {
 	unlock(&bubble.mu)
 	if wake != nil {
 		goready(wake, 0)
+	} else if bubble.deterministic != nil {
+		bubble.deterministicFaultWake()
 	}
 }
 
