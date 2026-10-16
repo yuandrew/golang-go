@@ -429,6 +429,76 @@ func TestUnsupportedValues(t *testing.T) {
 	}
 }
 
+// Issue 81176: UnsupportedValueError.Value should hold the NaN or ±Inf value.
+func TestUnsupportedValueErrorValue(t *testing.T) {
+	type NamedFloat float64
+	tests := []struct {
+		CaseName
+		in   any
+		want any
+	}{
+		{Name(""), NamedFloat(math.NaN()), NamedFloat(math.NaN())},
+		{Name(""), math.Inf(-1), math.Inf(-1)},
+		{Name(""), NamedFloat(math.Inf(1)), NamedFloat(math.Inf(1))},
+		{Name(""), map[string]float64{"x": math.Inf(1)}, math.Inf(1)},
+		{Name(""), []NamedFloat{NamedFloat(math.NaN())}, NamedFloat(math.NaN())},
+		{Name(""), struct{ F float64 }{math.Inf(-1)}, math.Inf(-1)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.Name, func(t *testing.T) {
+			_, err := Marshal(tt.in)
+			uve, ok := err.(*UnsupportedValueError)
+			if !ok {
+				t.Fatalf("%s: Marshal error:\n\tgot:  %T\n\twant: %T", tt.Where, err, new(UnsupportedValueError))
+			}
+			got := uve.Value
+			want := reflect.ValueOf(tt.want)
+			if got.Type() != want.Type() {
+				t.Fatalf("%s: UnsupportedValueError.Value.Type = %v, want %v", tt.Where, got.Type(), want.Type())
+			}
+			equalFloat := func(x, y float64) bool {
+				return x == y || math.IsNaN(x) == math.IsNaN(y)
+			}
+			if !equalFloat(got.Float(), want.Float()) {
+				t.Fatalf("%s: UnsupportedValueError.Value.Float = %v, want %v", tt.Where, got.Float(), want.Float())
+			}
+		})
+	}
+}
+
+// Issue 82079: UnsupportedValueError.Value should hold the value with the cycle.
+func TestUnsupportedValueErrorValueCycle(t *testing.T) {
+	tests := []struct {
+		CaseName
+		in   any
+		want reflect.Type
+	}{
+		{Name(""), pointerCycle, reflect.TypeFor[*PointerCycle]()},
+		{Name(""), pointerCycleIndirect, reflect.TypeFor[*PointerCycleIndirect]()},
+		{Name(""), mapCycle, reflect.TypeFor[map[string]any]()},
+		{Name(""), sliceCycle, reflect.TypeFor[[]any]()},
+		{Name(""), recursiveSliceCycle, reflect.TypeFor[RecursiveSlice]()},
+	}
+	for _, tt := range tests {
+		t.Run(tt.Name, func(t *testing.T) {
+			_, err := Marshal(tt.in)
+			uve, ok := err.(*UnsupportedValueError)
+			if !ok {
+				t.Fatalf("%s: Marshal error:\n\tgot:  %T\n\twant: %T", tt.Where, err, new(UnsupportedValueError))
+			}
+			if !uve.Value.IsValid() {
+				t.Fatalf("%s: UnsupportedValueError.Value is invalid", tt.Where)
+			}
+			if got := uve.Value.Type(); got != tt.want {
+				t.Fatalf("%s: UnsupportedValueError.Value.Type = %v, want %v", tt.Where, got, tt.want)
+			}
+			if got, want := uve.Str, "encountered a cycle via "+tt.want.String(); got != want {
+				t.Fatalf("%s: UnsupportedValueError.Str = %q, want %q", tt.Where, got, want)
+			}
+		})
+	}
+}
+
 // Issue 43207
 func TestMarshalTextFloatMap(t *testing.T) {
 	m := map[textfloat]string{
@@ -843,6 +913,23 @@ type BugY struct {
 	BugD
 }
 
+// A tag name holding a character isValidTag rejects is not a name at all, so
+// the field keeps its Go name. See golang.org/issue/81383.
+func TestInvalidTagNameUsesFieldName(t *testing.T) {
+	var v struct {
+		Quote     int `json:"one\"two"`
+		Backslash int `json:"one\\two"`
+		Valid     int `json:"ok"`
+	}
+	got, err := Marshal(v)
+	if err != nil {
+		t.Fatalf("Marshal error: %v", err)
+	}
+	if want := `{"Quote":0,"Backslash":0,"ok":0}`; string(got) != want {
+		t.Errorf("Marshal:\n\tgot  %s\n\twant %s", got, want)
+	}
+}
+
 // Test that a field with a tag dominates untagged fields.
 func TestTaggedFieldDominates(t *testing.T) {
 	v := BugY{
@@ -1132,6 +1219,40 @@ func TestStringKindTextMarshalerMapKey(t *testing.T) {
 	const want = `{"foo":"X_bar"}`
 	if string(got) != want {
 		t.Errorf("Marshal:\n\tgot:  %s\n\twant: %s", got, want)
+	}
+}
+
+// ptrTextMarshalerString is a string kind that implements encoding.TextMarshaler
+// with a pointer receiver.
+type ptrTextMarshalerString string
+
+func (s *ptrTextMarshalerString) MarshalText() ([]byte, error) {
+	return []byte("P_" + string(*s)), nil
+}
+
+// Map keys of pointer kind are not used directly, so MarshalText is called
+// even if they point to a string kind, including when held in an interface.
+func TestPointerToStringKindTextMarshalerMapKey(t *testing.T) {
+	k1 := textMarshalerString("foo")
+	k2 := ptrTextMarshalerString("foo")
+	tests := []struct {
+		in   any
+		want string
+	}{
+		{map[*textMarshalerString]int{&k1: 1}, `{"X_foo":1}`},
+		{map[*ptrTextMarshalerString]int{&k2: 1}, `{"P_foo":1}`},
+		{map[ptrTextMarshalerString]int{"foo": 1}, `{"foo":1}`},
+		{map[encoding.TextMarshaler]int{&k1: 1}, `{"X_foo":1}`},
+		{map[encoding.TextMarshaler]int{&k2: 1}, `{"P_foo":1}`},
+	}
+	for _, tt := range tests {
+		got, err := Marshal(tt.in)
+		if err != nil {
+			t.Fatalf("Marshal(%T) error: %v", tt.in, err)
+		}
+		if string(got) != tt.want {
+			t.Errorf("Marshal(%T):\n\tgot:  %s\n\twant: %s", tt.in, got, tt.want)
+		}
 	}
 }
 

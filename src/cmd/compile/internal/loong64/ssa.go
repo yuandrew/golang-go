@@ -446,19 +446,40 @@ func ssaGenValue(s *ssagen.State, v *ssa.Value) {
 		ssaop.OpLOONG64MOVVload,
 		ssaop.OpLOONG64MOVFload,
 		ssaop.OpLOONG64MOVDload:
-		p := s.Prog(v.Op.Asm())
+		as := v.Op.Asm()
+		if v.Aux == nil && v.AuxInt&0x3 == 0 && !ssa.Is12Bit(v.AuxInt) {
+			switch v.Op {
+			case ssaop.OpLOONG64MOVWload:
+				as = loong64.AMOVWP
+			case ssaop.OpLOONG64MOVVload:
+				as = loong64.AMOVVP
+			}
+		}
+
+		p := s.Prog(as)
 		p.From.Type = obj.TYPE_MEM
 		p.From.Reg = v.Args[0].Reg()
 		ssagen.AddAux(&p.From, v)
 		p.To.Type = obj.TYPE_REG
 		p.To.Reg = v.Reg()
+
 	case ssaop.OpLOONG64MOVBstore,
 		ssaop.OpLOONG64MOVHstore,
 		ssaop.OpLOONG64MOVWstore,
 		ssaop.OpLOONG64MOVVstore,
 		ssaop.OpLOONG64MOVFstore,
 		ssaop.OpLOONG64MOVDstore:
-		p := s.Prog(v.Op.Asm())
+		as := v.Op.Asm()
+		if v.Aux == nil && v.AuxInt&0x3 == 0 && !ssa.Is12Bit(v.AuxInt) {
+			switch v.Op {
+			case ssaop.OpLOONG64MOVWstore:
+				as = loong64.AMOVWP
+			case ssaop.OpLOONG64MOVVstore:
+				as = loong64.AMOVVP
+			}
+		}
+
+		p := s.Prog(as)
 		p.From.Type = obj.TYPE_REG
 		p.From.Reg = v.Args[1].Reg()
 		p.To.Type = obj.TYPE_MEM
@@ -1246,8 +1267,38 @@ func ssaGenValue(s *ssagen.State, v *ssa.Value) {
 		p.To.Type = obj.TYPE_REG
 		p.To.Reg = v.Reg()
 
-	case ssaop.OpClobber, ssaop.OpClobberReg:
-		// TODO: implement for clobberdead experiment. Nop is ok for now.
+	case ssaop.OpClobber:
+		// MOVV $0xdeaddead, REGTMP
+		// MOVW REGTMP, (slot)
+		// MOVW REGTMP, 4(slot)
+		x := uint32(0xdeaddead)
+		p1 := s.Prog(loong64.AMOVV)
+		p1.From.Type = obj.TYPE_CONST
+		p1.From.Offset = int64(x)
+		p1.To.Type = obj.TYPE_REG
+		p1.To.Reg = loong64.REGTMP
+
+		p2 := s.Prog(loong64.AMOVW)
+		p2.From.Type = obj.TYPE_REG
+		p2.From.Reg = loong64.REGTMP
+		p2.To.Type = obj.TYPE_MEM
+		p2.To.Reg = loong64.REGSP
+		ssagen.AddAux(&p2.To, v)
+
+		p3 := s.Prog(loong64.AMOVW)
+		p3.From.Type = obj.TYPE_REG
+		p3.From.Reg = loong64.REGTMP
+		p3.To.Type = obj.TYPE_MEM
+		p3.To.Reg = loong64.REGSP
+		ssagen.AddAux2(&p3.To, v, v.AuxInt+4)
+
+	case ssaop.OpClobberReg:
+		x := uint64(0xdeaddeaddeaddead)
+		p := s.Prog(loong64.AMOVV)
+		p.From.Type = obj.TYPE_CONST
+		p.From.Offset = int64(x)
+		p.To.Type = obj.TYPE_REG
+		p.To.Reg = v.Reg()
 	default:
 		v.Fatalf("genValue not implemented: %s", v.LongString())
 	}

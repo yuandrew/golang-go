@@ -735,7 +735,7 @@ func pereloc1(arch *sys.Arch, out *ld.OutBuf, ldr *loader.Loader, s loader.Sym, 
 	default:
 		return false
 
-	case objabi.R_DWARFSECREF:
+	case objabi.R_ADDROFF, objabi.R_DWARFSECREF:
 		out.Write32(uint32(sectoff))
 		out.Write32(uint32(symdynid))
 		out.Write16(ld.IMAGE_REL_ARM64_SECREL)
@@ -1417,9 +1417,12 @@ func trampoline(ctxt *ld.Link, ldr *loader.Loader, ri int, rs, s loader.Sym) {
 					if r.Add() != 0 {
 						ctxt.Errorf(s, "nonzero addend for DYNIMPORT call: %v+%d", ldr.SymName(rs), r.Add())
 					}
+					// TODO: Define how DWARF should describe a trampoline
+					// whose final target is resolved dynamically through the GOT.
 					gentrampgot(ctxt, ldr, trampb, rs)
 				} else {
 					gentramp(ctxt, ldr, trampb, rs, r.Add())
+					ctxt.AddDwarfDirectTrampoline(tramp, rs, r.Add(), ldr.SymUnit(s))
 				}
 			}
 			// modify reloc to point to tramp, which will be resolved later

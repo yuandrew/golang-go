@@ -6,213 +6,281 @@ package archsimd
 
 /* Abs */
 
-// Abs computes the absolute value of each element.
+// Abs returns the elementwise absolute value of x.
 //
 // Asm: ZFABS, CPU Feature: SVE
-func (x Float32s) Abs() Float32s
+func (x Float32s) Abs() (z Float32s)
 
-// Abs computes the absolute value of each element.
+// Abs returns the elementwise absolute value of x.
 //
 // Asm: ZFABS, CPU Feature: SVE
-func (x Float64s) Abs() Float64s
+func (x Float64s) Abs() (z Float64s)
 
-// Abs computes the absolute value of each element.
+// Abs returns the elementwise absolute value of x.
 //
 // Asm: ZABS, CPU Feature: SVE
-func (x Int8s) Abs() Int8s
+func (x Int8s) Abs() (z Uint8s)
 
-// Abs computes the absolute value of each element.
+// Abs returns the elementwise absolute value of x.
 //
 // Asm: ZABS, CPU Feature: SVE
-func (x Int16s) Abs() Int16s
+func (x Int16s) Abs() (z Uint16s)
 
-// Abs computes the absolute value of each element.
+// Abs returns the elementwise absolute value of x.
 //
 // Asm: ZABS, CPU Feature: SVE
-func (x Int32s) Abs() Int32s
+func (x Int32s) Abs() (z Uint32s)
 
-// Abs computes the absolute value of each element.
+// Abs returns the elementwise absolute value of x.
 //
 // Asm: ZABS, CPU Feature: SVE
-func (x Int64s) Abs() Int64s
+func (x Int64s) Abs() (z Uint64s)
 
 /* Add */
 
-// Add adds corresponding elements of two vectors.
+// Add adds x and y elementwise.
+//
+//	z[i] = x[i] + y[i]
 //
 // Asm: ZFADD, CPU Feature: SVE
-func (x Float32s) Add(y Float32s) Float32s
+func (x Float32s) Add(y Float32s) (z Float32s)
 
-// Add adds corresponding elements of two vectors.
+// Add adds x and y elementwise.
+//
+//	z[i] = x[i] + y[i]
 //
 // Asm: ZFADD, CPU Feature: SVE
-func (x Float64s) Add(y Float64s) Float64s
+func (x Float64s) Add(y Float64s) (z Float64s)
 
-// Add adds corresponding elements of two vectors.
+// Add adds x and y elementwise.
+//
+//	z[i] = x[i] + y[i]
 //
 // Asm: ZADD, CPU Feature: SVE
-func (x Int8s) Add(y Int8s) Int8s
+func (x Int8s) Add(y Int8s) (z Int8s)
 
-// Add adds corresponding elements of two vectors.
+// Add adds x and y elementwise.
+//
+//	z[i] = x[i] + y[i]
 //
 // Asm: ZADD, CPU Feature: SVE
-func (x Int16s) Add(y Int16s) Int16s
+func (x Int16s) Add(y Int16s) (z Int16s)
 
-// Add adds corresponding elements of two vectors.
+// Add adds x and y elementwise.
+//
+//	z[i] = x[i] + y[i]
 //
 // Asm: ZADD, CPU Feature: SVE
-func (x Int32s) Add(y Int32s) Int32s
+func (x Int32s) Add(y Int32s) (z Int32s)
 
-// Add adds corresponding elements of two vectors.
+// Add adds x and y elementwise.
+//
+//	z[i] = x[i] + y[i]
 //
 // Asm: ZADD, CPU Feature: SVE
-func (x Int64s) Add(y Int64s) Int64s
+func (x Int64s) Add(y Int64s) (z Int64s)
 
-// Add adds corresponding elements of two vectors.
+// Add adds x and y elementwise.
+//
+//	z[i] = x[i] + y[i]
 //
 // Asm: ZADD, CPU Feature: SVE
-func (x Uint8s) Add(y Uint8s) Uint8s
+func (x Uint8s) Add(y Uint8s) (z Uint8s)
 
-// Add adds corresponding elements of two vectors.
+// Add adds x and y elementwise.
+//
+//	z[i] = x[i] + y[i]
 //
 // Asm: ZADD, CPU Feature: SVE
-func (x Uint16s) Add(y Uint16s) Uint16s
+func (x Uint16s) Add(y Uint16s) (z Uint16s)
 
-// Add adds corresponding elements of two vectors.
+// Add adds x and y elementwise.
+//
+//	z[i] = x[i] + y[i]
 //
 // Asm: ZADD, CPU Feature: SVE
-func (x Uint32s) Add(y Uint32s) Uint32s
+func (x Uint32s) Add(y Uint32s) (z Uint32s)
 
-// Add adds corresponding elements of two vectors.
+// Add adds x and y elementwise.
+//
+//	z[i] = x[i] + y[i]
 //
 // Asm: ZADD, CPU Feature: SVE
-func (x Uint64s) Add(y Uint64s) Uint64s
+func (x Uint64s) Add(y Uint64s) (z Uint64s)
 
 /* AddSaturated */
 
-// AddSaturated adds corresponding elements of two vectors with saturation.
+// AddSaturated adds x and y elementwise with saturation.
+//
+//	z[i] = sat(x[i] + y[i])
 //
 // Asm: ZSQADD, CPU Feature: SVE
-func (x Int8s) AddSaturated(y Int8s) Int8s
+func (x Int8s) AddSaturated(y Int8s) (z Int8s)
 
-// AddSaturated adds corresponding elements of two vectors with saturation.
+// AddSaturated adds x and y elementwise with saturation.
+//
+//	z[i] = sat(x[i] + y[i])
 //
 // Asm: ZSQADD, CPU Feature: SVE
-func (x Int16s) AddSaturated(y Int16s) Int16s
+func (x Int16s) AddSaturated(y Int16s) (z Int16s)
 
-// AddSaturated adds corresponding elements of two vectors with saturation.
+// AddSaturated adds x and y elementwise with saturation.
+//
+//	z[i] = sat(x[i] + y[i])
 //
 // Asm: ZSQADD, CPU Feature: SVE
-func (x Int32s) AddSaturated(y Int32s) Int32s
+func (x Int32s) AddSaturated(y Int32s) (z Int32s)
 
-// AddSaturated adds corresponding elements of two vectors with saturation.
+// AddSaturated adds x and y elementwise with saturation.
+//
+//	z[i] = sat(x[i] + y[i])
 //
 // Asm: ZSQADD, CPU Feature: SVE
-func (x Int64s) AddSaturated(y Int64s) Int64s
+func (x Int64s) AddSaturated(y Int64s) (z Int64s)
 
-// AddSaturated adds corresponding elements of two vectors with saturation.
+// AddSaturated adds x and y elementwise with saturation.
+//
+//	z[i] = sat(x[i] + y[i])
 //
 // Asm: ZUQADD, CPU Feature: SVE
-func (x Uint8s) AddSaturated(y Uint8s) Uint8s
+func (x Uint8s) AddSaturated(y Uint8s) (z Uint8s)
 
-// AddSaturated adds corresponding elements of two vectors with saturation.
+// AddSaturated adds x and y elementwise with saturation.
+//
+//	z[i] = sat(x[i] + y[i])
 //
 // Asm: ZUQADD, CPU Feature: SVE
-func (x Uint16s) AddSaturated(y Uint16s) Uint16s
+func (x Uint16s) AddSaturated(y Uint16s) (z Uint16s)
 
-// AddSaturated adds corresponding elements of two vectors with saturation.
+// AddSaturated adds x and y elementwise with saturation.
+//
+//	z[i] = sat(x[i] + y[i])
 //
 // Asm: ZUQADD, CPU Feature: SVE
-func (x Uint32s) AddSaturated(y Uint32s) Uint32s
+func (x Uint32s) AddSaturated(y Uint32s) (z Uint32s)
 
-// AddSaturated adds corresponding elements of two vectors with saturation.
+// AddSaturated adds x and y elementwise with saturation.
+//
+//	z[i] = sat(x[i] + y[i])
 //
 // Asm: ZUQADD, CPU Feature: SVE
-func (x Uint64s) AddSaturated(y Uint64s) Uint64s
+func (x Uint64s) AddSaturated(y Uint64s) (z Uint64s)
 
 /* And */
 
-// And performs a bitwise x & y.
+// And returns the bitwise AND of x and y.
+//
+//	z[i] = x[i] & y[i]
 //
 // Asm: ZAND, CPU Feature: SVE
-func (x Int8s) And(y Int8s) Int8s
+func (x Int8s) And(y Int8s) (z Int8s)
 
-// And performs a bitwise x & y.
+// And returns the bitwise AND of x and y.
+//
+//	z[i] = x[i] & y[i]
 //
 // Asm: ZAND, CPU Feature: SVE
-func (x Int16s) And(y Int16s) Int16s
+func (x Int16s) And(y Int16s) (z Int16s)
 
-// And performs a bitwise x & y.
+// And returns the bitwise AND of x and y.
+//
+//	z[i] = x[i] & y[i]
 //
 // Asm: ZAND, CPU Feature: SVE
-func (x Int32s) And(y Int32s) Int32s
+func (x Int32s) And(y Int32s) (z Int32s)
 
-// And performs a bitwise x & y.
+// And returns the bitwise AND of x and y.
+//
+//	z[i] = x[i] & y[i]
 //
 // Asm: ZAND, CPU Feature: SVE
-func (x Int64s) And(y Int64s) Int64s
+func (x Int64s) And(y Int64s) (z Int64s)
 
-// And performs a bitwise x & y.
+// And returns the bitwise AND of x and y.
+//
+//	z[i] = x[i] & y[i]
 //
 // Asm: ZAND, CPU Feature: SVE
-func (x Uint8s) And(y Uint8s) Uint8s
+func (x Uint8s) And(y Uint8s) (z Uint8s)
 
-// And performs a bitwise x & y.
+// And returns the bitwise AND of x and y.
+//
+//	z[i] = x[i] & y[i]
 //
 // Asm: ZAND, CPU Feature: SVE
-func (x Uint16s) And(y Uint16s) Uint16s
+func (x Uint16s) And(y Uint16s) (z Uint16s)
 
-// And performs a bitwise x & y.
+// And returns the bitwise AND of x and y.
+//
+//	z[i] = x[i] & y[i]
 //
 // Asm: ZAND, CPU Feature: SVE
-func (x Uint32s) And(y Uint32s) Uint32s
+func (x Uint32s) And(y Uint32s) (z Uint32s)
 
-// And performs a bitwise x & y.
+// And returns the bitwise AND of x and y.
+//
+//	z[i] = x[i] & y[i]
 //
 // Asm: ZAND, CPU Feature: SVE
-func (x Uint64s) And(y Uint64s) Uint64s
+func (x Uint64s) And(y Uint64s) (z Uint64s)
 
 /* AndNot */
 
-// AndNot performs a bitwise x &^ y.
+// AndNot returns the bitwise AND NOT of x and y.
+//
+//	z[i] = x[i] &^ y[i]
 //
 // Asm: ZBIC, CPU Feature: SVE
-func (x Int8s) AndNot(y Int8s) Int8s
+func (x Int8s) AndNot(y Int8s) (z Int8s)
 
-// AndNot performs a bitwise x &^ y.
+// AndNot returns the bitwise AND NOT of x and y.
+//
+//	z[i] = x[i] &^ y[i]
 //
 // Asm: ZBIC, CPU Feature: SVE
-func (x Int16s) AndNot(y Int16s) Int16s
+func (x Int16s) AndNot(y Int16s) (z Int16s)
 
-// AndNot performs a bitwise x &^ y.
+// AndNot returns the bitwise AND NOT of x and y.
+//
+//	z[i] = x[i] &^ y[i]
 //
 // Asm: ZBIC, CPU Feature: SVE
-func (x Int32s) AndNot(y Int32s) Int32s
+func (x Int32s) AndNot(y Int32s) (z Int32s)
 
-// AndNot performs a bitwise x &^ y.
+// AndNot returns the bitwise AND NOT of x and y.
+//
+//	z[i] = x[i] &^ y[i]
 //
 // Asm: ZBIC, CPU Feature: SVE
-func (x Int64s) AndNot(y Int64s) Int64s
+func (x Int64s) AndNot(y Int64s) (z Int64s)
 
-// AndNot performs a bitwise x &^ y.
+// AndNot returns the bitwise AND NOT of x and y.
+//
+//	z[i] = x[i] &^ y[i]
 //
 // Asm: ZBIC, CPU Feature: SVE
-func (x Uint8s) AndNot(y Uint8s) Uint8s
+func (x Uint8s) AndNot(y Uint8s) (z Uint8s)
 
-// AndNot performs a bitwise x &^ y.
+// AndNot returns the bitwise AND NOT of x and y.
+//
+//	z[i] = x[i] &^ y[i]
 //
 // Asm: ZBIC, CPU Feature: SVE
-func (x Uint16s) AndNot(y Uint16s) Uint16s
+func (x Uint16s) AndNot(y Uint16s) (z Uint16s)
 
-// AndNot performs a bitwise x &^ y.
+// AndNot returns the bitwise AND NOT of x and y.
+//
+//	z[i] = x[i] &^ y[i]
 //
 // Asm: ZBIC, CPU Feature: SVE
-func (x Uint32s) AndNot(y Uint32s) Uint32s
+func (x Uint32s) AndNot(y Uint32s) (z Uint32s)
 
-// AndNot performs a bitwise x &^ y.
+// AndNot returns the bitwise AND NOT of x and y.
+//
+//	z[i] = x[i] &^ y[i]
 //
 // Asm: ZBIC, CPU Feature: SVE
-func (x Uint64s) AndNot(y Uint64s) Uint64s
+func (x Uint64s) AndNot(y Uint64s) (z Uint64s)
 
 /* Ceil */
 
@@ -226,57 +294,131 @@ func (x Float32s) Ceil() Float32s
 // Asm: ZFRINTP, CPU Feature: SVE
 func (x Float64s) Ceil() Float64s
 
+/* Div */
+
+// Div divides x by y elementwise.
+//
+//	z[i] = x[i] / y[i]
+//
+// Division by zero does not panic, and the result follows IEEE 754. That is,
+// dividing a non-zero value by zero results in +/- infinity, and dividing zero
+// by zero results in NaN.
+//
+// Asm: ZFDIV, CPU Feature: SVE
+func (x Float32s) Div(y Float32s) (z Float32s)
+
+// Div divides x by y elementwise.
+//
+//	z[i] = x[i] / y[i]
+//
+// Division by zero does not panic, and the result follows IEEE 754. That is,
+// dividing a non-zero value by zero results in +/- infinity, and dividing zero
+// by zero results in NaN.
+//
+// Asm: ZFDIV, CPU Feature: SVE
+func (x Float64s) Div(y Float64s) (z Float64s)
+
+// Div divides x by y elementwise.
+//
+//	z[i] = x[i] / y[i]
+//
+// The result is rounded toward zero (truncated division), just like Go's /
+// operator. Also like Go's / operator, dividing MinInt32
+// by -1 results in MinInt32, since the true result is unrepresentable.
+// Unlike Go's / operator, division by zero does not panic and instead produces
+// a zero result for that element.
+//
+// Asm: ZSDIV, CPU Feature: SVE
+func (x Int32s) Div(y Int32s) (z Int32s)
+
+// Div divides x by y elementwise.
+//
+//	z[i] = x[i] / y[i]
+//
+// The result is rounded toward zero (truncated division), just like Go's /
+// operator. Also like Go's / operator, dividing MinInt64
+// by -1 results in MinInt64, since the true result is unrepresentable.
+// Unlike Go's / operator, division by zero does not panic and instead produces
+// a zero result for that element.
+//
+// Asm: ZSDIV, CPU Feature: SVE
+func (x Int64s) Div(y Int64s) (z Int64s)
+
+// Div divides x by y elementwise.
+//
+//	z[i] = x[i] / y[i]
+//
+// The result is rounded toward zero (truncated division), just like Go's /
+// operator.
+// Unlike Go's / operator, division by zero does not panic and instead produces
+// a zero result for that element.
+//
+// Asm: ZUDIV, CPU Feature: SVE
+func (x Uint32s) Div(y Uint32s) (z Uint32s)
+
+// Div divides x by y elementwise.
+//
+//	z[i] = x[i] / y[i]
+//
+// The result is rounded toward zero (truncated division), just like Go's /
+// operator.
+// Unlike Go's / operator, division by zero does not panic and instead produces
+// a zero result for that element.
+//
+// Asm: ZUDIV, CPU Feature: SVE
+func (x Uint64s) Div(y Uint64s) (z Uint64s)
+
 /* Equal */
 
-// Equal returns a mask whose elements indicate whether x == y.
+// Equal returns a mask indicating which elements of x and y are equal.
 //
 // Asm: ZFCMEQ, CPU Feature: SVE
-func (x Float32s) Equal(y Float32s) Mask32s
+func (x Float32s) Equal(y Float32s) (z Mask32s)
 
-// Equal returns a mask whose elements indicate whether x == y.
+// Equal returns a mask indicating which elements of x and y are equal.
 //
 // Asm: ZFCMEQ, CPU Feature: SVE
-func (x Float64s) Equal(y Float64s) Mask64s
+func (x Float64s) Equal(y Float64s) (z Mask64s)
 
-// Equal returns a mask whose elements indicate whether x == y.
+// Equal returns a mask indicating which elements of x and y are equal.
 //
 // Asm: ZCMPEQ, CPU Feature: SVE
-func (x Int8s) Equal(y Int8s) Mask8s
+func (x Int8s) Equal(y Int8s) (z Mask8s)
 
-// Equal returns a mask whose elements indicate whether x == y.
+// Equal returns a mask indicating which elements of x and y are equal.
 //
 // Asm: ZCMPEQ, CPU Feature: SVE
-func (x Int16s) Equal(y Int16s) Mask16s
+func (x Int16s) Equal(y Int16s) (z Mask16s)
 
-// Equal returns a mask whose elements indicate whether x == y.
+// Equal returns a mask indicating which elements of x and y are equal.
 //
 // Asm: ZCMPEQ, CPU Feature: SVE
-func (x Int32s) Equal(y Int32s) Mask32s
+func (x Int32s) Equal(y Int32s) (z Mask32s)
 
-// Equal returns a mask whose elements indicate whether x == y.
+// Equal returns a mask indicating which elements of x and y are equal.
 //
 // Asm: ZCMPEQ, CPU Feature: SVE
-func (x Int64s) Equal(y Int64s) Mask64s
+func (x Int64s) Equal(y Int64s) (z Mask64s)
 
-// Equal returns a mask whose elements indicate whether x == y.
+// Equal returns a mask indicating which elements of x and y are equal.
 //
 // Asm: ZCMPEQ, CPU Feature: SVE
-func (x Uint8s) Equal(y Uint8s) Mask8s
+func (x Uint8s) Equal(y Uint8s) (z Mask8s)
 
-// Equal returns a mask whose elements indicate whether x == y.
+// Equal returns a mask indicating which elements of x and y are equal.
 //
 // Asm: ZCMPEQ, CPU Feature: SVE
-func (x Uint16s) Equal(y Uint16s) Mask16s
+func (x Uint16s) Equal(y Uint16s) (z Mask16s)
 
-// Equal returns a mask whose elements indicate whether x == y.
+// Equal returns a mask indicating which elements of x and y are equal.
 //
 // Asm: ZCMPEQ, CPU Feature: SVE
-func (x Uint32s) Equal(y Uint32s) Mask32s
+func (x Uint32s) Equal(y Uint32s) (z Mask32s)
 
-// Equal returns a mask whose elements indicate whether x == y.
+// Equal returns a mask indicating which elements of x and y are equal.
 //
 // Asm: ZCMPEQ, CPU Feature: SVE
-func (x Uint64s) Equal(y Uint64s) Mask64s
+func (x Uint64s) Equal(y Uint64s) (z Mask64s)
 
 /* Floor */
 
@@ -292,159 +434,445 @@ func (x Float64s) Floor() Float64s
 
 /* Greater */
 
-// Greater returns a mask whose elements indicate whether x > y.
+// Greater returns a mask indicating which elements of x are greater than y.
+//
+//	z[i] = x[i] > y[i]
 //
 // Asm: ZFCMGT, CPU Feature: SVE
-func (x Float32s) Greater(y Float32s) Mask32s
+func (x Float32s) Greater(y Float32s) (z Mask32s)
 
-// Greater returns a mask whose elements indicate whether x > y.
+// Greater returns a mask indicating which elements of x are greater than y.
+//
+//	z[i] = x[i] > y[i]
 //
 // Asm: ZFCMGT, CPU Feature: SVE
-func (x Float64s) Greater(y Float64s) Mask64s
+func (x Float64s) Greater(y Float64s) (z Mask64s)
 
-// Greater returns a mask whose elements indicate whether x > y.
+// Greater returns a mask indicating which elements of x are greater than y.
+//
+//	z[i] = x[i] > y[i]
 //
 // Asm: ZCMPGT, CPU Feature: SVE
-func (x Int8s) Greater(y Int8s) Mask8s
+func (x Int8s) Greater(y Int8s) (z Mask8s)
 
-// Greater returns a mask whose elements indicate whether x > y.
+// Greater returns a mask indicating which elements of x are greater than y.
+//
+//	z[i] = x[i] > y[i]
 //
 // Asm: ZCMPGT, CPU Feature: SVE
-func (x Int16s) Greater(y Int16s) Mask16s
+func (x Int16s) Greater(y Int16s) (z Mask16s)
 
-// Greater returns a mask whose elements indicate whether x > y.
+// Greater returns a mask indicating which elements of x are greater than y.
+//
+//	z[i] = x[i] > y[i]
 //
 // Asm: ZCMPGT, CPU Feature: SVE
-func (x Int32s) Greater(y Int32s) Mask32s
+func (x Int32s) Greater(y Int32s) (z Mask32s)
 
-// Greater returns a mask whose elements indicate whether x > y.
+// Greater returns a mask indicating which elements of x are greater than y.
+//
+//	z[i] = x[i] > y[i]
 //
 // Asm: ZCMPGT, CPU Feature: SVE
-func (x Int64s) Greater(y Int64s) Mask64s
+func (x Int64s) Greater(y Int64s) (z Mask64s)
 
-// Greater returns a mask whose elements indicate whether x > y.
+// Greater returns a mask indicating which elements of x are greater than y.
+//
+//	z[i] = x[i] > y[i]
 //
 // Asm: ZCMPHI, CPU Feature: SVE
-func (x Uint8s) Greater(y Uint8s) Mask8s
+func (x Uint8s) Greater(y Uint8s) (z Mask8s)
 
-// Greater returns a mask whose elements indicate whether x > y.
+// Greater returns a mask indicating which elements of x are greater than y.
+//
+//	z[i] = x[i] > y[i]
 //
 // Asm: ZCMPHI, CPU Feature: SVE
-func (x Uint16s) Greater(y Uint16s) Mask16s
+func (x Uint16s) Greater(y Uint16s) (z Mask16s)
 
-// Greater returns a mask whose elements indicate whether x > y.
+// Greater returns a mask indicating which elements of x are greater than y.
+//
+//	z[i] = x[i] > y[i]
 //
 // Asm: ZCMPHI, CPU Feature: SVE
-func (x Uint32s) Greater(y Uint32s) Mask32s
+func (x Uint32s) Greater(y Uint32s) (z Mask32s)
 
-// Greater returns a mask whose elements indicate whether x > y.
+// Greater returns a mask indicating which elements of x are greater than y.
+//
+//	z[i] = x[i] > y[i]
 //
 // Asm: ZCMPHI, CPU Feature: SVE
-func (x Uint64s) Greater(y Uint64s) Mask64s
+func (x Uint64s) Greater(y Uint64s) (z Mask64s)
 
 /* GreaterEqual */
 
-// GreaterEqual returns a mask whose elements indicate whether x >= y.
+// GreaterEqual returns a mask indicating which elements of x are greater than
+// or equal to y.
+//
+//	z[i] = x[i] >= y[i]
 //
 // Asm: ZFCMGE, CPU Feature: SVE
-func (x Float32s) GreaterEqual(y Float32s) Mask32s
+func (x Float32s) GreaterEqual(y Float32s) (z Mask32s)
 
-// GreaterEqual returns a mask whose elements indicate whether x >= y.
+// GreaterEqual returns a mask indicating which elements of x are greater than
+// or equal to y.
+//
+//	z[i] = x[i] >= y[i]
 //
 // Asm: ZFCMGE, CPU Feature: SVE
-func (x Float64s) GreaterEqual(y Float64s) Mask64s
+func (x Float64s) GreaterEqual(y Float64s) (z Mask64s)
 
-// GreaterEqual returns a mask whose elements indicate whether x >= y.
+// GreaterEqual returns a mask indicating which elements of x are greater than
+// or equal to y.
+//
+//	z[i] = x[i] >= y[i]
 //
 // Asm: ZCMPGE, CPU Feature: SVE
-func (x Int8s) GreaterEqual(y Int8s) Mask8s
+func (x Int8s) GreaterEqual(y Int8s) (z Mask8s)
 
-// GreaterEqual returns a mask whose elements indicate whether x >= y.
+// GreaterEqual returns a mask indicating which elements of x are greater than
+// or equal to y.
+//
+//	z[i] = x[i] >= y[i]
 //
 // Asm: ZCMPGE, CPU Feature: SVE
-func (x Int16s) GreaterEqual(y Int16s) Mask16s
+func (x Int16s) GreaterEqual(y Int16s) (z Mask16s)
 
-// GreaterEqual returns a mask whose elements indicate whether x >= y.
+// GreaterEqual returns a mask indicating which elements of x are greater than
+// or equal to y.
+//
+//	z[i] = x[i] >= y[i]
 //
 // Asm: ZCMPGE, CPU Feature: SVE
-func (x Int32s) GreaterEqual(y Int32s) Mask32s
+func (x Int32s) GreaterEqual(y Int32s) (z Mask32s)
 
-// GreaterEqual returns a mask whose elements indicate whether x >= y.
+// GreaterEqual returns a mask indicating which elements of x are greater than
+// or equal to y.
+//
+//	z[i] = x[i] >= y[i]
 //
 // Asm: ZCMPGE, CPU Feature: SVE
-func (x Int64s) GreaterEqual(y Int64s) Mask64s
+func (x Int64s) GreaterEqual(y Int64s) (z Mask64s)
 
-// GreaterEqual returns a mask whose elements indicate whether x >= y.
+// GreaterEqual returns a mask indicating which elements of x are greater than
+// or equal to y.
+//
+//	z[i] = x[i] >= y[i]
 //
 // Asm: ZCMPHS, CPU Feature: SVE
-func (x Uint8s) GreaterEqual(y Uint8s) Mask8s
+func (x Uint8s) GreaterEqual(y Uint8s) (z Mask8s)
 
-// GreaterEqual returns a mask whose elements indicate whether x >= y.
+// GreaterEqual returns a mask indicating which elements of x are greater than
+// or equal to y.
+//
+//	z[i] = x[i] >= y[i]
 //
 // Asm: ZCMPHS, CPU Feature: SVE
-func (x Uint16s) GreaterEqual(y Uint16s) Mask16s
+func (x Uint16s) GreaterEqual(y Uint16s) (z Mask16s)
 
-// GreaterEqual returns a mask whose elements indicate whether x >= y.
+// GreaterEqual returns a mask indicating which elements of x are greater than
+// or equal to y.
+//
+//	z[i] = x[i] >= y[i]
 //
 // Asm: ZCMPHS, CPU Feature: SVE
-func (x Uint32s) GreaterEqual(y Uint32s) Mask32s
+func (x Uint32s) GreaterEqual(y Uint32s) (z Mask32s)
 
-// GreaterEqual returns a mask whose elements indicate whether x >= y.
+// GreaterEqual returns a mask indicating which elements of x are greater than
+// or equal to y.
+//
+//	z[i] = x[i] >= y[i]
 //
 // Asm: ZCMPHS, CPU Feature: SVE
-func (x Uint64s) GreaterEqual(y Uint64s) Mask64s
+func (x Uint64s) GreaterEqual(y Uint64s) (z Mask64s)
+
+/* Max */
+
+// Max returns the elementwise maximum of x and y.
+//
+//	z[i] = max(x[i], y[i])
+//
+// Asm: ZFMAX, CPU Feature: SVE
+func (x Float32s) Max(y Float32s) (z Float32s)
+
+// Max returns the elementwise maximum of x and y.
+//
+//	z[i] = max(x[i], y[i])
+//
+// Asm: ZFMAX, CPU Feature: SVE
+func (x Float64s) Max(y Float64s) (z Float64s)
+
+// Max returns the elementwise maximum of x and y.
+//
+//	z[i] = max(x[i], y[i])
+//
+// Asm: ZSMAX, CPU Feature: SVE
+func (x Int8s) Max(y Int8s) (z Int8s)
+
+// Max returns the elementwise maximum of x and y.
+//
+//	z[i] = max(x[i], y[i])
+//
+// Asm: ZSMAX, CPU Feature: SVE
+func (x Int16s) Max(y Int16s) (z Int16s)
+
+// Max returns the elementwise maximum of x and y.
+//
+//	z[i] = max(x[i], y[i])
+//
+// Asm: ZSMAX, CPU Feature: SVE
+func (x Int32s) Max(y Int32s) (z Int32s)
+
+// Max returns the elementwise maximum of x and y.
+//
+//	z[i] = max(x[i], y[i])
+//
+// Asm: ZSMAX, CPU Feature: SVE
+func (x Int64s) Max(y Int64s) (z Int64s)
+
+// Max returns the elementwise maximum of x and y.
+//
+//	z[i] = max(x[i], y[i])
+//
+// Asm: ZUMAX, CPU Feature: SVE
+func (x Uint8s) Max(y Uint8s) (z Uint8s)
+
+// Max returns the elementwise maximum of x and y.
+//
+//	z[i] = max(x[i], y[i])
+//
+// Asm: ZUMAX, CPU Feature: SVE
+func (x Uint16s) Max(y Uint16s) (z Uint16s)
+
+// Max returns the elementwise maximum of x and y.
+//
+//	z[i] = max(x[i], y[i])
+//
+// Asm: ZUMAX, CPU Feature: SVE
+func (x Uint32s) Max(y Uint32s) (z Uint32s)
+
+// Max returns the elementwise maximum of x and y.
+//
+//	z[i] = max(x[i], y[i])
+//
+// Asm: ZUMAX, CPU Feature: SVE
+func (x Uint64s) Max(y Uint64s) (z Uint64s)
+
+/* Min */
+
+// Min returns the elementwise minimum of x and y.
+//
+//	z[i] = min(x[i], y[i])
+//
+// Asm: ZFMIN, CPU Feature: SVE
+func (x Float32s) Min(y Float32s) (z Float32s)
+
+// Min returns the elementwise minimum of x and y.
+//
+//	z[i] = min(x[i], y[i])
+//
+// Asm: ZFMIN, CPU Feature: SVE
+func (x Float64s) Min(y Float64s) (z Float64s)
+
+// Min returns the elementwise minimum of x and y.
+//
+//	z[i] = min(x[i], y[i])
+//
+// Asm: ZSMIN, CPU Feature: SVE
+func (x Int8s) Min(y Int8s) (z Int8s)
+
+// Min returns the elementwise minimum of x and y.
+//
+//	z[i] = min(x[i], y[i])
+//
+// Asm: ZSMIN, CPU Feature: SVE
+func (x Int16s) Min(y Int16s) (z Int16s)
+
+// Min returns the elementwise minimum of x and y.
+//
+//	z[i] = min(x[i], y[i])
+//
+// Asm: ZSMIN, CPU Feature: SVE
+func (x Int32s) Min(y Int32s) (z Int32s)
+
+// Min returns the elementwise minimum of x and y.
+//
+//	z[i] = min(x[i], y[i])
+//
+// Asm: ZSMIN, CPU Feature: SVE
+func (x Int64s) Min(y Int64s) (z Int64s)
+
+// Min returns the elementwise minimum of x and y.
+//
+//	z[i] = min(x[i], y[i])
+//
+// Asm: ZUMIN, CPU Feature: SVE
+func (x Uint8s) Min(y Uint8s) (z Uint8s)
+
+// Min returns the elementwise minimum of x and y.
+//
+//	z[i] = min(x[i], y[i])
+//
+// Asm: ZUMIN, CPU Feature: SVE
+func (x Uint16s) Min(y Uint16s) (z Uint16s)
+
+// Min returns the elementwise minimum of x and y.
+//
+//	z[i] = min(x[i], y[i])
+//
+// Asm: ZUMIN, CPU Feature: SVE
+func (x Uint32s) Min(y Uint32s) (z Uint32s)
+
+// Min returns the elementwise minimum of x and y.
+//
+//	z[i] = min(x[i], y[i])
+//
+// Asm: ZUMIN, CPU Feature: SVE
+func (x Uint64s) Min(y Uint64s) (z Uint64s)
 
 /* Mul */
 
-// Mul multiplies corresponding elements of two vectors, modulo 2ⁿ.
+// Mul returns the elementwise product of x and y.
+//
+//	z[i] = x[i] * y[i]
 //
 // Asm: ZFMUL, CPU Feature: SVE
-func (x Float32s) Mul(y Float32s) Float32s
+func (x Float32s) Mul(y Float32s) (z Float32s)
 
-// Mul multiplies corresponding elements of two vectors, modulo 2ⁿ.
+// Mul returns the elementwise product of x and y.
+//
+//	z[i] = x[i] * y[i]
 //
 // Asm: ZFMUL, CPU Feature: SVE
-func (x Float64s) Mul(y Float64s) Float64s
+func (x Float64s) Mul(y Float64s) (z Float64s)
 
-// Mul multiplies corresponding elements of two vectors, modulo 2ⁿ.
+// Mul returns the elementwise product of x and y.
+//
+//	z[i] = x[i] * y[i]
 //
 // Asm: ZMUL, CPU Feature: SVE
-func (x Int8s) Mul(y Int8s) Int8s
+func (x Int8s) Mul(y Int8s) (z Int8s)
 
-// Mul multiplies corresponding elements of two vectors, modulo 2ⁿ.
+// Mul returns the elementwise product of x and y.
+//
+//	z[i] = x[i] * y[i]
 //
 // Asm: ZMUL, CPU Feature: SVE
-func (x Int16s) Mul(y Int16s) Int16s
+func (x Int16s) Mul(y Int16s) (z Int16s)
 
-// Mul multiplies corresponding elements of two vectors, modulo 2ⁿ.
+// Mul returns the elementwise product of x and y.
+//
+//	z[i] = x[i] * y[i]
 //
 // Asm: ZMUL, CPU Feature: SVE
-func (x Int32s) Mul(y Int32s) Int32s
+func (x Int32s) Mul(y Int32s) (z Int32s)
 
-// Mul multiplies corresponding elements of two vectors, modulo 2ⁿ.
+// Mul returns the elementwise product of x and y.
+//
+//	z[i] = x[i] * y[i]
 //
 // Asm: ZMUL, CPU Feature: SVE
-func (x Int64s) Mul(y Int64s) Int64s
+func (x Int64s) Mul(y Int64s) (z Int64s)
 
-// Mul multiplies corresponding elements of two vectors, modulo 2ⁿ.
+// Mul returns the elementwise product of x and y.
+//
+//	z[i] = x[i] * y[i]
 //
 // Asm: ZMUL, CPU Feature: SVE
-func (x Uint8s) Mul(y Uint8s) Uint8s
+func (x Uint8s) Mul(y Uint8s) (z Uint8s)
 
-// Mul multiplies corresponding elements of two vectors, modulo 2ⁿ.
+// Mul returns the elementwise product of x and y.
+//
+//	z[i] = x[i] * y[i]
 //
 // Asm: ZMUL, CPU Feature: SVE
-func (x Uint16s) Mul(y Uint16s) Uint16s
+func (x Uint16s) Mul(y Uint16s) (z Uint16s)
 
-// Mul multiplies corresponding elements of two vectors, modulo 2ⁿ.
+// Mul returns the elementwise product of x and y.
+//
+//	z[i] = x[i] * y[i]
 //
 // Asm: ZMUL, CPU Feature: SVE
-func (x Uint32s) Mul(y Uint32s) Uint32s
+func (x Uint32s) Mul(y Uint32s) (z Uint32s)
 
-// Mul multiplies corresponding elements of two vectors, modulo 2ⁿ.
+// Mul returns the elementwise product of x and y.
+//
+//	z[i] = x[i] * y[i]
 //
 // Asm: ZMUL, CPU Feature: SVE
-func (x Uint64s) Mul(y Uint64s) Uint64s
+func (x Uint64s) Mul(y Uint64s) (z Uint64s)
+
+/* MulAdd */
+
+// MulAdd returns x * y + z elementwise.
+//
+//	w[i] = x[i] * y[i] + z[i]
+//
+// Asm: ZFMLA, CPU Feature: SVE
+func (x Float32s) MulAdd(y Float32s, z Float32s) (w Float32s)
+
+// MulAdd returns x * y + z elementwise.
+//
+//	w[i] = x[i] * y[i] + z[i]
+//
+// Asm: ZFMLA, CPU Feature: SVE
+func (x Float64s) MulAdd(y Float64s, z Float64s) (w Float64s)
+
+// MulAdd returns x * y + z elementwise.
+//
+//	w[i] = x[i] * y[i] + z[i]
+//
+// Asm: ZMLA, CPU Feature: SVE
+func (x Int8s) MulAdd(y Int8s, z Int8s) (w Int8s)
+
+// MulAdd returns x * y + z elementwise.
+//
+//	w[i] = x[i] * y[i] + z[i]
+//
+// Asm: ZMLA, CPU Feature: SVE
+func (x Int16s) MulAdd(y Int16s, z Int16s) (w Int16s)
+
+// MulAdd returns x * y + z elementwise.
+//
+//	w[i] = x[i] * y[i] + z[i]
+//
+// Asm: ZMLA, CPU Feature: SVE
+func (x Int32s) MulAdd(y Int32s, z Int32s) (w Int32s)
+
+// MulAdd returns x * y + z elementwise.
+//
+//	w[i] = x[i] * y[i] + z[i]
+//
+// Asm: ZMLA, CPU Feature: SVE
+func (x Int64s) MulAdd(y Int64s, z Int64s) (w Int64s)
+
+// MulAdd returns x * y + z elementwise.
+//
+//	w[i] = x[i] * y[i] + z[i]
+//
+// Asm: ZMLA, CPU Feature: SVE
+func (x Uint8s) MulAdd(y Uint8s, z Uint8s) (w Uint8s)
+
+// MulAdd returns x * y + z elementwise.
+//
+//	w[i] = x[i] * y[i] + z[i]
+//
+// Asm: ZMLA, CPU Feature: SVE
+func (x Uint16s) MulAdd(y Uint16s, z Uint16s) (w Uint16s)
+
+// MulAdd returns x * y + z elementwise.
+//
+//	w[i] = x[i] * y[i] + z[i]
+//
+// Asm: ZMLA, CPU Feature: SVE
+func (x Uint32s) MulAdd(y Uint32s, z Uint32s) (w Uint32s)
+
+// MulAdd returns x * y + z elementwise.
+//
+//	w[i] = x[i] * y[i] + z[i]
+//
+// Asm: ZMLA, CPU Feature: SVE
+func (x Uint64s) MulAdd(y Uint64s, z Uint64s) (w Uint64s)
 
 /* MulHigh */
 
@@ -492,127 +920,155 @@ func (x Uint64s) MulHigh(y Uint64s) Uint64s
 
 // Neg returns the elementwise negation of x.
 //
-// Asm: ZFNEG, CPU Feature: SVE
-func (x Float32s) Neg() Float32s
-
-// Neg returns the elementwise negation of x.
+//	z[i] = -x[i]
 //
 // Asm: ZFNEG, CPU Feature: SVE
-func (x Float64s) Neg() Float64s
+func (x Float32s) Neg() (z Float32s)
 
 // Neg returns the elementwise negation of x.
 //
-// Asm: ZNEG, CPU Feature: SVE
-func (x Int8s) Neg() Int8s
+//	z[i] = -x[i]
+//
+// Asm: ZFNEG, CPU Feature: SVE
+func (x Float64s) Neg() (z Float64s)
 
 // Neg returns the elementwise negation of x.
 //
+//	z[i] = -x[i]
+//
 // Asm: ZNEG, CPU Feature: SVE
-func (x Int16s) Neg() Int16s
+func (x Int8s) Neg() (z Int8s)
 
 // Neg returns the elementwise negation of x.
 //
+//	z[i] = -x[i]
+//
 // Asm: ZNEG, CPU Feature: SVE
-func (x Int32s) Neg() Int32s
+func (x Int16s) Neg() (z Int16s)
 
 // Neg returns the elementwise negation of x.
 //
+//	z[i] = -x[i]
+//
 // Asm: ZNEG, CPU Feature: SVE
-func (x Int64s) Neg() Int64s
+func (x Int32s) Neg() (z Int32s)
+
+// Neg returns the elementwise negation of x.
+//
+//	z[i] = -x[i]
+//
+// Asm: ZNEG, CPU Feature: SVE
+func (x Int64s) Neg() (z Int64s)
 
 /* NotEqual */
 
-// NotEqual returns a mask whose elements indicate whether x != y.
+// NotEqual returns a mask indicating which elements of x and y are not equal.
 //
 // Asm: ZFCMNE, CPU Feature: SVE
-func (x Float32s) NotEqual(y Float32s) Mask32s
+func (x Float32s) NotEqual(y Float32s) (z Mask32s)
 
-// NotEqual returns a mask whose elements indicate whether x != y.
+// NotEqual returns a mask indicating which elements of x and y are not equal.
 //
 // Asm: ZFCMNE, CPU Feature: SVE
-func (x Float64s) NotEqual(y Float64s) Mask64s
+func (x Float64s) NotEqual(y Float64s) (z Mask64s)
 
-// NotEqual returns a mask whose elements indicate whether x != y.
+// NotEqual returns a mask indicating which elements of x and y are not equal.
 //
 // Asm: ZCMPNE, CPU Feature: SVE
-func (x Int8s) NotEqual(y Int8s) Mask8s
+func (x Int8s) NotEqual(y Int8s) (z Mask8s)
 
-// NotEqual returns a mask whose elements indicate whether x != y.
+// NotEqual returns a mask indicating which elements of x and y are not equal.
 //
 // Asm: ZCMPNE, CPU Feature: SVE
-func (x Int16s) NotEqual(y Int16s) Mask16s
+func (x Int16s) NotEqual(y Int16s) (z Mask16s)
 
-// NotEqual returns a mask whose elements indicate whether x != y.
+// NotEqual returns a mask indicating which elements of x and y are not equal.
 //
 // Asm: ZCMPNE, CPU Feature: SVE
-func (x Int32s) NotEqual(y Int32s) Mask32s
+func (x Int32s) NotEqual(y Int32s) (z Mask32s)
 
-// NotEqual returns a mask whose elements indicate whether x != y.
+// NotEqual returns a mask indicating which elements of x and y are not equal.
 //
 // Asm: ZCMPNE, CPU Feature: SVE
-func (x Int64s) NotEqual(y Int64s) Mask64s
+func (x Int64s) NotEqual(y Int64s) (z Mask64s)
 
-// NotEqual returns a mask whose elements indicate whether x != y.
+// NotEqual returns a mask indicating which elements of x and y are not equal.
 //
 // Asm: ZCMPNE, CPU Feature: SVE
-func (x Uint8s) NotEqual(y Uint8s) Mask8s
+func (x Uint8s) NotEqual(y Uint8s) (z Mask8s)
 
-// NotEqual returns a mask whose elements indicate whether x != y.
+// NotEqual returns a mask indicating which elements of x and y are not equal.
 //
 // Asm: ZCMPNE, CPU Feature: SVE
-func (x Uint16s) NotEqual(y Uint16s) Mask16s
+func (x Uint16s) NotEqual(y Uint16s) (z Mask16s)
 
-// NotEqual returns a mask whose elements indicate whether x != y.
+// NotEqual returns a mask indicating which elements of x and y are not equal.
 //
 // Asm: ZCMPNE, CPU Feature: SVE
-func (x Uint32s) NotEqual(y Uint32s) Mask32s
+func (x Uint32s) NotEqual(y Uint32s) (z Mask32s)
 
-// NotEqual returns a mask whose elements indicate whether x != y.
+// NotEqual returns a mask indicating which elements of x and y are not equal.
 //
 // Asm: ZCMPNE, CPU Feature: SVE
-func (x Uint64s) NotEqual(y Uint64s) Mask64s
+func (x Uint64s) NotEqual(y Uint64s) (z Mask64s)
 
 /* Or */
 
-// Or performs a bitwise x | y.
+// Or returns the bitwise OR of x and y.
+//
+//	z[i] = x[i] | y[i]
 //
 // Asm: ZORR, CPU Feature: SVE
-func (x Int8s) Or(y Int8s) Int8s
+func (x Int8s) Or(y Int8s) (z Int8s)
 
-// Or performs a bitwise x | y.
+// Or returns the bitwise OR of x and y.
+//
+//	z[i] = x[i] | y[i]
 //
 // Asm: ZORR, CPU Feature: SVE
-func (x Int16s) Or(y Int16s) Int16s
+func (x Int16s) Or(y Int16s) (z Int16s)
 
-// Or performs a bitwise x | y.
+// Or returns the bitwise OR of x and y.
+//
+//	z[i] = x[i] | y[i]
 //
 // Asm: ZORR, CPU Feature: SVE
-func (x Int32s) Or(y Int32s) Int32s
+func (x Int32s) Or(y Int32s) (z Int32s)
 
-// Or performs a bitwise x | y.
+// Or returns the bitwise OR of x and y.
+//
+//	z[i] = x[i] | y[i]
 //
 // Asm: ZORR, CPU Feature: SVE
-func (x Int64s) Or(y Int64s) Int64s
+func (x Int64s) Or(y Int64s) (z Int64s)
 
-// Or performs a bitwise x | y.
+// Or returns the bitwise OR of x and y.
+//
+//	z[i] = x[i] | y[i]
 //
 // Asm: ZORR, CPU Feature: SVE
-func (x Uint8s) Or(y Uint8s) Uint8s
+func (x Uint8s) Or(y Uint8s) (z Uint8s)
 
-// Or performs a bitwise x | y.
+// Or returns the bitwise OR of x and y.
+//
+//	z[i] = x[i] | y[i]
 //
 // Asm: ZORR, CPU Feature: SVE
-func (x Uint16s) Or(y Uint16s) Uint16s
+func (x Uint16s) Or(y Uint16s) (z Uint16s)
 
-// Or performs a bitwise x | y.
+// Or returns the bitwise OR of x and y.
+//
+//	z[i] = x[i] | y[i]
 //
 // Asm: ZORR, CPU Feature: SVE
-func (x Uint32s) Or(y Uint32s) Uint32s
+func (x Uint32s) Or(y Uint32s) (z Uint32s)
 
-// Or performs a bitwise x | y.
+// Or returns the bitwise OR of x and y.
+//
+//	z[i] = x[i] | y[i]
 //
 // Asm: ZORR, CPU Feature: SVE
-func (x Uint64s) Or(y Uint64s) Uint64s
+func (x Uint64s) Or(y Uint64s) (z Uint64s)
 
 /* Round */
 
@@ -628,109 +1084,149 @@ func (x Float64s) Round() Float64s
 
 /* Sqrt */
 
-// Sqrt computes the square root of each element.
+// Sqrt returns the elementwise square root of x.
+//
+//	z[i] = sqrt(x[i])
 //
 // Asm: ZFSQRT, CPU Feature: SVE
-func (x Float32s) Sqrt() Float32s
+func (x Float32s) Sqrt() (z Float32s)
 
-// Sqrt computes the square root of each element.
+// Sqrt returns the elementwise square root of x.
+//
+//	z[i] = sqrt(x[i])
 //
 // Asm: ZFSQRT, CPU Feature: SVE
-func (x Float64s) Sqrt() Float64s
+func (x Float64s) Sqrt() (z Float64s)
 
 /* Sub */
 
-// Sub subtracts corresponding elements of two vectors.
+// Sub subtracts y from x elementwise.
+//
+//	z[i] = x[i] - y[i]
 //
 // Asm: ZFSUB, CPU Feature: SVE
-func (x Float32s) Sub(y Float32s) Float32s
+func (x Float32s) Sub(y Float32s) (z Float32s)
 
-// Sub subtracts corresponding elements of two vectors.
+// Sub subtracts y from x elementwise.
+//
+//	z[i] = x[i] - y[i]
 //
 // Asm: ZFSUB, CPU Feature: SVE
-func (x Float64s) Sub(y Float64s) Float64s
+func (x Float64s) Sub(y Float64s) (z Float64s)
 
-// Sub subtracts corresponding elements of two vectors.
+// Sub subtracts y from x elementwise.
+//
+//	z[i] = x[i] - y[i]
 //
 // Asm: ZSUB, CPU Feature: SVE
-func (x Int8s) Sub(y Int8s) Int8s
+func (x Int8s) Sub(y Int8s) (z Int8s)
 
-// Sub subtracts corresponding elements of two vectors.
+// Sub subtracts y from x elementwise.
+//
+//	z[i] = x[i] - y[i]
 //
 // Asm: ZSUB, CPU Feature: SVE
-func (x Int16s) Sub(y Int16s) Int16s
+func (x Int16s) Sub(y Int16s) (z Int16s)
 
-// Sub subtracts corresponding elements of two vectors.
+// Sub subtracts y from x elementwise.
+//
+//	z[i] = x[i] - y[i]
 //
 // Asm: ZSUB, CPU Feature: SVE
-func (x Int32s) Sub(y Int32s) Int32s
+func (x Int32s) Sub(y Int32s) (z Int32s)
 
-// Sub subtracts corresponding elements of two vectors.
+// Sub subtracts y from x elementwise.
+//
+//	z[i] = x[i] - y[i]
 //
 // Asm: ZSUB, CPU Feature: SVE
-func (x Int64s) Sub(y Int64s) Int64s
+func (x Int64s) Sub(y Int64s) (z Int64s)
 
-// Sub subtracts corresponding elements of two vectors.
+// Sub subtracts y from x elementwise.
+//
+//	z[i] = x[i] - y[i]
 //
 // Asm: ZSUB, CPU Feature: SVE
-func (x Uint8s) Sub(y Uint8s) Uint8s
+func (x Uint8s) Sub(y Uint8s) (z Uint8s)
 
-// Sub subtracts corresponding elements of two vectors.
+// Sub subtracts y from x elementwise.
+//
+//	z[i] = x[i] - y[i]
 //
 // Asm: ZSUB, CPU Feature: SVE
-func (x Uint16s) Sub(y Uint16s) Uint16s
+func (x Uint16s) Sub(y Uint16s) (z Uint16s)
 
-// Sub subtracts corresponding elements of two vectors.
+// Sub subtracts y from x elementwise.
+//
+//	z[i] = x[i] - y[i]
 //
 // Asm: ZSUB, CPU Feature: SVE
-func (x Uint32s) Sub(y Uint32s) Uint32s
+func (x Uint32s) Sub(y Uint32s) (z Uint32s)
 
-// Sub subtracts corresponding elements of two vectors.
+// Sub subtracts y from x elementwise.
+//
+//	z[i] = x[i] - y[i]
 //
 // Asm: ZSUB, CPU Feature: SVE
-func (x Uint64s) Sub(y Uint64s) Uint64s
+func (x Uint64s) Sub(y Uint64s) (z Uint64s)
 
 /* SubSaturated */
 
-// SubSaturated subtracts corresponding elements of two vectors with saturation.
+// SubSaturated subtracts y from x elementwise with saturation.
+//
+//	z[i] = sat(x[i] - y[i])
 //
 // Asm: ZSQSUB, CPU Feature: SVE
-func (x Int8s) SubSaturated(y Int8s) Int8s
+func (x Int8s) SubSaturated(y Int8s) (z Int8s)
 
-// SubSaturated subtracts corresponding elements of two vectors with saturation.
+// SubSaturated subtracts y from x elementwise with saturation.
+//
+//	z[i] = sat(x[i] - y[i])
 //
 // Asm: ZSQSUB, CPU Feature: SVE
-func (x Int16s) SubSaturated(y Int16s) Int16s
+func (x Int16s) SubSaturated(y Int16s) (z Int16s)
 
-// SubSaturated subtracts corresponding elements of two vectors with saturation.
+// SubSaturated subtracts y from x elementwise with saturation.
+//
+//	z[i] = sat(x[i] - y[i])
 //
 // Asm: ZSQSUB, CPU Feature: SVE
-func (x Int32s) SubSaturated(y Int32s) Int32s
+func (x Int32s) SubSaturated(y Int32s) (z Int32s)
 
-// SubSaturated subtracts corresponding elements of two vectors with saturation.
+// SubSaturated subtracts y from x elementwise with saturation.
+//
+//	z[i] = sat(x[i] - y[i])
 //
 // Asm: ZSQSUB, CPU Feature: SVE
-func (x Int64s) SubSaturated(y Int64s) Int64s
+func (x Int64s) SubSaturated(y Int64s) (z Int64s)
 
-// SubSaturated subtracts corresponding elements of two vectors with saturation.
+// SubSaturated subtracts y from x elementwise with saturation.
+//
+//	z[i] = sat(x[i] - y[i])
 //
 // Asm: ZUQSUB, CPU Feature: SVE
-func (x Uint8s) SubSaturated(y Uint8s) Uint8s
+func (x Uint8s) SubSaturated(y Uint8s) (z Uint8s)
 
-// SubSaturated subtracts corresponding elements of two vectors with saturation.
+// SubSaturated subtracts y from x elementwise with saturation.
+//
+//	z[i] = sat(x[i] - y[i])
 //
 // Asm: ZUQSUB, CPU Feature: SVE
-func (x Uint16s) SubSaturated(y Uint16s) Uint16s
+func (x Uint16s) SubSaturated(y Uint16s) (z Uint16s)
 
-// SubSaturated subtracts corresponding elements of two vectors with saturation.
+// SubSaturated subtracts y from x elementwise with saturation.
+//
+//	z[i] = sat(x[i] - y[i])
 //
 // Asm: ZUQSUB, CPU Feature: SVE
-func (x Uint32s) SubSaturated(y Uint32s) Uint32s
+func (x Uint32s) SubSaturated(y Uint32s) (z Uint32s)
 
-// SubSaturated subtracts corresponding elements of two vectors with saturation.
+// SubSaturated subtracts y from x elementwise with saturation.
+//
+//	z[i] = sat(x[i] - y[i])
 //
 // Asm: ZUQSUB, CPU Feature: SVE
-func (x Uint64s) SubSaturated(y Uint64s) Uint64s
+func (x Uint64s) SubSaturated(y Uint64s) (z Uint64s)
 
 /* Trunc */
 
@@ -746,138 +1242,250 @@ func (x Float64s) Trunc() Float64s
 
 /* Xor */
 
-// Xor performs a bitwise x ^ y.
+// Xor returns the bitwise XOR of x and y.
+//
+//	z[i] = x[i] ^ y[i]
 //
 // Asm: ZEOR, CPU Feature: SVE
-func (x Int8s) Xor(y Int8s) Int8s
+func (x Int8s) Xor(y Int8s) (z Int8s)
 
-// Xor performs a bitwise x ^ y.
+// Xor returns the bitwise XOR of x and y.
+//
+//	z[i] = x[i] ^ y[i]
 //
 // Asm: ZEOR, CPU Feature: SVE
-func (x Int16s) Xor(y Int16s) Int16s
+func (x Int16s) Xor(y Int16s) (z Int16s)
 
-// Xor performs a bitwise x ^ y.
+// Xor returns the bitwise XOR of x and y.
+//
+//	z[i] = x[i] ^ y[i]
 //
 // Asm: ZEOR, CPU Feature: SVE
-func (x Int32s) Xor(y Int32s) Int32s
+func (x Int32s) Xor(y Int32s) (z Int32s)
 
-// Xor performs a bitwise x ^ y.
+// Xor returns the bitwise XOR of x and y.
+//
+//	z[i] = x[i] ^ y[i]
 //
 // Asm: ZEOR, CPU Feature: SVE
-func (x Int64s) Xor(y Int64s) Int64s
+func (x Int64s) Xor(y Int64s) (z Int64s)
 
-// Xor performs a bitwise x ^ y.
+// Xor returns the bitwise XOR of x and y.
+//
+//	z[i] = x[i] ^ y[i]
 //
 // Asm: ZEOR, CPU Feature: SVE
-func (x Uint8s) Xor(y Uint8s) Uint8s
+func (x Uint8s) Xor(y Uint8s) (z Uint8s)
 
-// Xor performs a bitwise x ^ y.
+// Xor returns the bitwise XOR of x and y.
+//
+//	z[i] = x[i] ^ y[i]
 //
 // Asm: ZEOR, CPU Feature: SVE
-func (x Uint16s) Xor(y Uint16s) Uint16s
+func (x Uint16s) Xor(y Uint16s) (z Uint16s)
 
-// Xor performs a bitwise x ^ y.
+// Xor returns the bitwise XOR of x and y.
+//
+//	z[i] = x[i] ^ y[i]
 //
 // Asm: ZEOR, CPU Feature: SVE
-func (x Uint32s) Xor(y Uint32s) Uint32s
+func (x Uint32s) Xor(y Uint32s) (z Uint32s)
 
-// Xor performs a bitwise x ^ y.
+// Xor returns the bitwise XOR of x and y.
+//
+//	z[i] = x[i] ^ y[i]
 //
 // Asm: ZEOR, CPU Feature: SVE
-func (x Uint64s) Xor(y Uint64s) Uint64s
+func (x Uint64s) Xor(y Uint64s) (z Uint64s)
 
-// BitsToInt8 reinterprets the bits of a Uint8s vector as a Int8s vector
-func (x Uint8s) BitsToInt8() Int8s
+// BitsToInt8 reinterprets the bits of each element of x as type int8.
+func (x Uint8s) BitsToInt8() (z Int8s)
 
-// ConvertToInt8 converts a Uint8s vector to a Int8s vector
-func (x Uint8s) ConvertToInt8() Int8s
+// ConvertToInt8 converts each element of x to int8.
+func (x Uint8s) ConvertToInt8() (z Int8s)
 
-// ConvertToUint8 converts a Int8s vector to a Uint8s vector
-func (x Int8s) ConvertToUint8() Uint8s
+// ConvertToUint8 converts each element of x to uint8.
+func (x Int8s) ConvertToUint8() (z Uint8s)
 
-// ToBits reinterprets the bits of a Int8s vector as a Uint8s vector
-func (x Int8s) ToBits() Uint8s
+// ToBits reinterprets the bits of each element of x as type uint8.
+func (x Int8s) ToBits() (z Uint8s)
 
-// ReshapeToUint16s reinterprets the bits of a Uint8s vector as a Uint16s vector
-func (x Uint8s) ReshapeToUint16s() Uint16s
+// ReshapeToUint16s reinterprets the bits of x as a Uint16s vector.
+//
+// Both the vector elements and the bits of each element are interpreted in
+// little endian order.
+//
+//	⋯     x[3]      x[2]      x[1]      x[0]
+//	⋯ | 7  .. 0 | 7  .. 0 | 7  .. 0 | 7  .. 0 |
+//	⋯ | 15     ....     0 | 15     ....     0 |
+//	⋯          z[1]                z[0]
+func (x Uint8s) ReshapeToUint16s() (z Uint16s)
 
-// ReshapeToUint32s reinterprets the bits of a Uint8s vector as a Uint32s vector
-func (x Uint8s) ReshapeToUint32s() Uint32s
+// ReshapeToUint32s reinterprets the bits of x as a Uint32s vector.
+//
+// Both the vector elements and the bits of each element are interpreted in
+// little endian order.
+//
+//	⋯     x[7]      x[6]      x[5]      x[4]      x[3]      x[2]      x[1]      x[0]
+//	⋯ | 7  .. 0 | 7  .. 0 | 7  .. 0 | 7  .. 0 | 7  .. 0 | 7  .. 0 | 7  .. 0 | 7  .. 0 |
+//	⋯ | 31               ....               0 | 31               ....               0 |
+//	⋯                    z[1]                                    z[0]
+func (x Uint8s) ReshapeToUint32s() (z Uint32s)
 
-// ReshapeToUint64s reinterprets the bits of a Uint8s vector as a Uint64s vector
-func (x Uint8s) ReshapeToUint64s() Uint64s
+// ReshapeToUint64s reinterprets the bits of x as a Uint64s vector.
+//
+// Both the vector elements and the bits of each element are interpreted in
+// little endian order.
+//
+//	⋯    x[15]     x[14]    ⋯     x[9]      x[8]      x[7]      x[6]    ⋯     x[1]      x[0]
+//	⋯ | 7  .. 0 | 7  .. 0 | ⋯ | 7  .. 0 | 7  .. 0 | 7  .. 0 | 7  .. 0 | ⋯ | 7  .. 0 | 7  .. 0 |
+//	⋯ | 63                 ....                 0 | 63                 ....                 0 |
+//	⋯                      z[1]                                        z[0]
+func (x Uint8s) ReshapeToUint64s() (z Uint64s)
 
-// BitsToInt16 reinterprets the bits of a Uint16s vector as a Int16s vector
-func (x Uint16s) BitsToInt16() Int16s
+// BitsToInt16 reinterprets the bits of each element of x as type int16.
+func (x Uint16s) BitsToInt16() (z Int16s)
 
-// ConvertToInt16 converts a Uint16s vector to a Int16s vector
-func (x Uint16s) ConvertToInt16() Int16s
+// ConvertToInt16 converts each element of x to int16.
+func (x Uint16s) ConvertToInt16() (z Int16s)
 
-// ConvertToUint16 converts a Int16s vector to a Uint16s vector
-func (x Int16s) ConvertToUint16() Uint16s
+// ConvertToUint16 converts each element of x to uint16.
+func (x Int16s) ConvertToUint16() (z Uint16s)
 
-// ToBits reinterprets the bits of a Int16s vector as a Uint16s vector
-func (x Int16s) ToBits() Uint16s
+// ToBits reinterprets the bits of each element of x as type uint16.
+func (x Int16s) ToBits() (z Uint16s)
 
-// ReshapeToUint8s reinterprets the bits of a Uint16s vector as a Uint8s vector
-func (x Uint16s) ReshapeToUint8s() Uint8s
+// ReshapeToUint8s reinterprets the bits of x as a Uint8s vector.
+//
+// Both the vector elements and the bits of each element are interpreted in
+// little endian order.
+//
+//	⋯          x[1]                x[0]
+//	⋯ | 15     ....     0 | 15     ....     0 |
+//	⋯ | 7  .. 0 | 7  .. 0 | 7  .. 0 | 7  .. 0 |
+//	⋯     z[3]      z[2]      z[1]      z[0]
+func (x Uint16s) ReshapeToUint8s() (z Uint8s)
 
-// ReshapeToUint32s reinterprets the bits of a Uint16s vector as a Uint32s vector
-func (x Uint16s) ReshapeToUint32s() Uint32s
+// ReshapeToUint32s reinterprets the bits of x as a Uint32s vector.
+//
+// Both the vector elements and the bits of each element are interpreted in
+// little endian order.
+//
+//	⋯     x[3]      x[2]      x[1]      x[0]
+//	⋯ | 15 .. 0 | 15 .. 0 | 15 .. 0 | 15 .. 0 |
+//	⋯ | 31     ....     0 | 31     ....     0 |
+//	⋯          z[1]                z[0]
+func (x Uint16s) ReshapeToUint32s() (z Uint32s)
 
-// ReshapeToUint64s reinterprets the bits of a Uint16s vector as a Uint64s vector
-func (x Uint16s) ReshapeToUint64s() Uint64s
+// ReshapeToUint64s reinterprets the bits of x as a Uint64s vector.
+//
+// Both the vector elements and the bits of each element are interpreted in
+// little endian order.
+//
+//	⋯     x[7]      x[6]      x[5]      x[4]      x[3]      x[2]      x[1]      x[0]
+//	⋯ | 15 .. 0 | 15 .. 0 | 15 .. 0 | 15 .. 0 | 15 .. 0 | 15 .. 0 | 15 .. 0 | 15 .. 0 |
+//	⋯ | 63               ....               0 | 63               ....               0 |
+//	⋯                    z[1]                                    z[0]
+func (x Uint16s) ReshapeToUint64s() (z Uint64s)
 
-// BitsToFloat32 reinterprets the bits of a Uint32s vector as a Float32s vector
-func (x Uint32s) BitsToFloat32() Float32s
+// BitsToFloat32 reinterprets the bits of each element of x as type float32.
+func (x Uint32s) BitsToFloat32() (z Float32s)
 
-// ToBits reinterprets the bits of a Float32s vector as a Uint32s vector
-func (x Float32s) ToBits() Uint32s
+// ToBits returns the IEEE 754 binary representation of each element of x.
+func (x Float32s) ToBits() (z Uint32s)
 
-// BitsToInt32 reinterprets the bits of a Uint32s vector as a Int32s vector
-func (x Uint32s) BitsToInt32() Int32s
+// BitsToInt32 reinterprets the bits of each element of x as type int32.
+func (x Uint32s) BitsToInt32() (z Int32s)
 
-// ConvertToInt32 converts a Uint32s vector to a Int32s vector
-func (x Uint32s) ConvertToInt32() Int32s
+// ConvertToInt32 converts each element of x to int32.
+func (x Uint32s) ConvertToInt32() (z Int32s)
 
-// ConvertToUint32 converts a Int32s vector to a Uint32s vector
-func (x Int32s) ConvertToUint32() Uint32s
+// ConvertToUint32 converts each element of x to uint32.
+func (x Int32s) ConvertToUint32() (z Uint32s)
 
-// ToBits reinterprets the bits of a Int32s vector as a Uint32s vector
-func (x Int32s) ToBits() Uint32s
+// ToBits reinterprets the bits of each element of x as type uint32.
+func (x Int32s) ToBits() (z Uint32s)
 
-// ReshapeToUint8s reinterprets the bits of a Uint32s vector as a Uint8s vector
-func (x Uint32s) ReshapeToUint8s() Uint8s
+// ReshapeToUint8s reinterprets the bits of x as a Uint8s vector.
+//
+// Both the vector elements and the bits of each element are interpreted in
+// little endian order.
+//
+//	⋯                    x[1]                                    x[0]
+//	⋯ | 31               ....               0 | 31               ....               0 |
+//	⋯ | 7  .. 0 | 7  .. 0 | 7  .. 0 | 7  .. 0 | 7  .. 0 | 7  .. 0 | 7  .. 0 | 7  .. 0 |
+//	⋯     z[7]      z[6]      z[5]      z[4]      z[3]      z[2]      z[1]      z[0]
+func (x Uint32s) ReshapeToUint8s() (z Uint8s)
 
-// ReshapeToUint16s reinterprets the bits of a Uint32s vector as a Uint16s vector
-func (x Uint32s) ReshapeToUint16s() Uint16s
+// ReshapeToUint16s reinterprets the bits of x as a Uint16s vector.
+//
+// Both the vector elements and the bits of each element are interpreted in
+// little endian order.
+//
+//	⋯          x[1]                x[0]
+//	⋯ | 31     ....     0 | 31     ....     0 |
+//	⋯ | 15 .. 0 | 15 .. 0 | 15 .. 0 | 15 .. 0 |
+//	⋯     z[3]      z[2]      z[1]      z[0]
+func (x Uint32s) ReshapeToUint16s() (z Uint16s)
 
-// ReshapeToUint64s reinterprets the bits of a Uint32s vector as a Uint64s vector
-func (x Uint32s) ReshapeToUint64s() Uint64s
+// ReshapeToUint64s reinterprets the bits of x as a Uint64s vector.
+//
+// Both the vector elements and the bits of each element are interpreted in
+// little endian order.
+//
+//	⋯     x[3]      x[2]      x[1]      x[0]
+//	⋯ | 31 .. 0 | 31 .. 0 | 31 .. 0 | 31 .. 0 |
+//	⋯ | 63     ....     0 | 63     ....     0 |
+//	⋯          z[1]                z[0]
+func (x Uint32s) ReshapeToUint64s() (z Uint64s)
 
-// BitsToFloat64 reinterprets the bits of a Uint64s vector as a Float64s vector
-func (x Uint64s) BitsToFloat64() Float64s
+// BitsToFloat64 reinterprets the bits of each element of x as type float64.
+func (x Uint64s) BitsToFloat64() (z Float64s)
 
-// ToBits reinterprets the bits of a Float64s vector as a Uint64s vector
-func (x Float64s) ToBits() Uint64s
+// ToBits returns the IEEE 754 binary representation of each element of x.
+func (x Float64s) ToBits() (z Uint64s)
 
-// BitsToInt64 reinterprets the bits of a Uint64s vector as a Int64s vector
-func (x Uint64s) BitsToInt64() Int64s
+// BitsToInt64 reinterprets the bits of each element of x as type int64.
+func (x Uint64s) BitsToInt64() (z Int64s)
 
-// ConvertToInt64 converts a Uint64s vector to a Int64s vector
-func (x Uint64s) ConvertToInt64() Int64s
+// ConvertToInt64 converts each element of x to int64.
+func (x Uint64s) ConvertToInt64() (z Int64s)
 
-// ConvertToUint64 converts a Int64s vector to a Uint64s vector
-func (x Int64s) ConvertToUint64() Uint64s
+// ConvertToUint64 converts each element of x to uint64.
+func (x Int64s) ConvertToUint64() (z Uint64s)
 
-// ToBits reinterprets the bits of a Int64s vector as a Uint64s vector
-func (x Int64s) ToBits() Uint64s
+// ToBits reinterprets the bits of each element of x as type uint64.
+func (x Int64s) ToBits() (z Uint64s)
 
-// ReshapeToUint8s reinterprets the bits of a Uint64s vector as a Uint8s vector
-func (x Uint64s) ReshapeToUint8s() Uint8s
+// ReshapeToUint8s reinterprets the bits of x as a Uint8s vector.
+//
+// Both the vector elements and the bits of each element are interpreted in
+// little endian order.
+//
+//	⋯                      x[1]                                        x[0]
+//	⋯ | 63                 ....                 0 | 63                 ....                 0 |
+//	⋯ | 7  .. 0 | 7  .. 0 | ⋯ | 7  .. 0 | 7  .. 0 | 7  .. 0 | 7  .. 0 | ⋯ | 7  .. 0 | 7  .. 0 |
+//	⋯    z[15]     z[14]    ⋯     z[9]      z[8]      z[7]      z[6]    ⋯     z[1]      z[0]
+func (x Uint64s) ReshapeToUint8s() (z Uint8s)
 
-// ReshapeToUint16s reinterprets the bits of a Uint64s vector as a Uint16s vector
-func (x Uint64s) ReshapeToUint16s() Uint16s
+// ReshapeToUint16s reinterprets the bits of x as a Uint16s vector.
+//
+// Both the vector elements and the bits of each element are interpreted in
+// little endian order.
+//
+//	⋯                    x[1]                                    x[0]
+//	⋯ | 63               ....               0 | 63               ....               0 |
+//	⋯ | 15 .. 0 | 15 .. 0 | 15 .. 0 | 15 .. 0 | 15 .. 0 | 15 .. 0 | 15 .. 0 | 15 .. 0 |
+//	⋯     z[7]      z[6]      z[5]      z[4]      z[3]      z[2]      z[1]      z[0]
+func (x Uint64s) ReshapeToUint16s() (z Uint16s)
 
-// ReshapeToUint32s reinterprets the bits of a Uint64s vector as a Uint32s vector
-func (x Uint64s) ReshapeToUint32s() Uint32s
+// ReshapeToUint32s reinterprets the bits of x as a Uint32s vector.
+//
+// Both the vector elements and the bits of each element are interpreted in
+// little endian order.
+//
+//	⋯          x[1]                x[0]
+//	⋯ | 63     ....     0 | 63     ....     0 |
+//	⋯ | 31 .. 0 | 31 .. 0 | 31 .. 0 | 31 .. 0 |
+//	⋯     z[3]      z[2]      z[1]      z[0]
+func (x Uint64s) ReshapeToUint32s() (z Uint32s)

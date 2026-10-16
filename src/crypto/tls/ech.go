@@ -9,6 +9,7 @@ import (
 	"crypto/hpke"
 	"errors"
 	"fmt"
+	"net/netip"
 	"strings"
 
 	"golang.org/x/crypto/cryptobyte"
@@ -313,6 +314,7 @@ func decodeInnerClientHello(outer *clientHelloMsg, encoded []byte) (*clientHello
 			recon.AddBytes(compressionMethods)
 		})
 		recon.AddUint16LengthPrefixed(func(recon *cryptobyte.Builder) {
+			var outerExtensionsSeen bool
 			for !extensions.Empty() {
 				var extension uint16
 				var extData cryptobyte.String
@@ -322,18 +324,30 @@ func decodeInnerClientHello(outer *clientHelloMsg, encoded []byte) (*clientHello
 					return
 				}
 				if extension == extensionECHOuterExtensions {
-					if !extData.ReadUint8LengthPrefixed(&extData) {
+					if outerExtensionsSeen {
+						recon.SetError(errors.New("tls: invalid outer extensions"))
+						return
+					}
+					outerExtensionsSeen = true
+					var outerExtensions cryptobyte.String
+					if !extData.ReadUint8LengthPrefixed(&outerExtensions) || !extData.Empty() ||
+						outerExtensions.Empty() {
 						recon.SetError(errors.New("tls: invalid inner client hello"))
 						return
 					}
+					// OuterExtensions reconstruction per RFC 9849, Appendix A.
+					// i scans the outer extensions in order and never rewinds,
+					// so a referenced type that is out of order or duplicated
+					// cannot be found again and is rejected.
 					var i int
-					for !extData.Empty() {
+					for !outerExtensions.Empty() {
 						var extType uint16
-						if !extData.ReadUint16(&extType) {
+						if !outerExtensions.ReadUint16(&extType) {
 							recon.SetError(errors.New("tls: invalid inner client hello"))
 							return
 						}
-						if extType == extensionEncryptedClientHello {
+						if extType == extensionEncryptedClientHello ||
+							extType == extensionECHOuterExtensions {
 							recon.SetError(errors.New("tls: invalid outer extensions"))
 							return
 						}
@@ -350,6 +364,7 @@ func decodeInnerClientHello(outer *clientHelloMsg, encoded []byte) (*clientHello
 						recon.AddUint16LengthPrefixed(func(recon *cryptobyte.Builder) {
 							recon.AddBytes(rawOuterExts[i].data)
 						})
+						i++
 					}
 				} else {
 					recon.AddUint16(extension)
@@ -455,6 +470,12 @@ func computeAndUpdateOuterECHExtension(outer, inner *clientHelloMsg, ech *echCli
 // picking a config. This can be somewhat lax because even if we pick a
 // valid-looking name, the DNS layer will later reject it anyway.
 func validDNSName(name string) bool {
+	// Reject public names the certificate verifier would interpret as IP addresses.
+	// RFC 9849, Section 6.1.7 explicitly rejects IPv4. IPv6 literals, including
+	// scoped addresses, are already excluded by the DNS syntax (they contain ':').
+	if _, err := netip.ParseAddr(name); err == nil {
+		return false
+	}
 	if len(name) > 253 {
 		return false
 	}

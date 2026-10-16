@@ -4,14 +4,14 @@ go 1.28
 
 require (
 	github.com/google/pprof v0.0.0-20260507013755-92041b743c96
-	golang.org/x/arch v0.29.0
+	golang.org/x/arch v0.31.1-0.20260922213335-ab53fe6c43b6
 	golang.org/x/build v0.0.0-20260715183034-a43f90886f2e
 	golang.org/x/mod v0.41.0
 	golang.org/x/sync v0.23.0
 	golang.org/x/sys v0.48.0
-	golang.org/x/telemetry v0.0.0-20260811182544-a038080d80e5
+	golang.org/x/telemetry v0.0.0-20260908163034-4bcc4b2ee518
 	golang.org/x/term v0.45.0
-	golang.org/x/tools v0.49.1-0.20260902161736-89ed5c340cb6
+	golang.org/x/tools v0.50.1-0.20260929192349-98444708d405
 )
 
 require (

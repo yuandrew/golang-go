@@ -1884,6 +1884,14 @@ func TestEscapeText(t *testing.T) {
 			"<script>`${ `}",
 			context{state: stateJSTmplLit, element: elementScript, jsBraceDepth: []int{0}},
 		},
+		{
+			"<script>`${1}${",
+			context{state: stateJS, element: elementScript, jsCtx: jsCtxRegexp, jsBraceDepth: []int{0}},
+		},
+		{
+			"<script>`${`${1}${",
+			context{state: stateJS, element: elementScript, jsCtx: jsCtxRegexp, jsBraceDepth: []int{0, 0}},
+		},
 	}
 
 	for _, test := range tests {
@@ -2213,6 +2221,47 @@ func BenchmarkEscapedExecute(b *testing.B) {
 	}
 }
 
+func BenchmarkEscapedExecuteBuiltinsPage(b *testing.B) {
+	type item struct {
+		Name   string
+		Status string
+		Tags   []string
+	}
+	items := make([]item, 20)
+	for i := range items {
+		items[i] = item{Name: "Item", Status: "active", Tags: []string{"new", "sale"}}
+	}
+	tmpl := Must(New("t").Parse(`<ul>{{range .}}<li{{if eq .Status "active"}} class="on"{{end}}>` +
+		`{{.Name}}{{if not .Tags}}-{{else}} ({{printf "%d tags" 2}}){{end}}</li>{{end}}</ul>`))
+	var buf bytes.Buffer
+	b.ReportAllocs()
+	for b.Loop() {
+		if err := tmpl.Execute(&buf, items); err != nil {
+			b.Fatal(err)
+		}
+		buf.Reset()
+	}
+}
+
+func BenchmarkEscapedExecutePage(b *testing.B) {
+	var src strings.Builder
+	src.WriteString(`<h1>{{.Title}}</h1><ul>`)
+	for range 20 {
+		src.WriteString(`<li><a href="/items/{{.ID}}" title="{{.Title}}">{{.Name}}</a></li>`)
+	}
+	src.WriteString(`</ul>`)
+	tmpl := Must(New("t").Parse(src.String()))
+	data := map[string]any{"Title": "Home", "ID": 42, "Name": "Ladies & Gentlemen"}
+	var buf bytes.Buffer
+	b.ReportAllocs()
+	for b.Loop() {
+		if err := tmpl.Execute(&buf, data); err != nil {
+			b.Fatal(err)
+		}
+		buf.Reset()
+	}
+}
+
 // Covers issue 22780.
 func TestOrphanedTemplate(t *testing.T) {
 	t1 := Must(New("foo").Parse(`<a href="{{.}}">link1</a>`))
@@ -2276,6 +2325,18 @@ func TestMetaContentEscapeGODEBUG(t *testing.T) {
 	}
 }
 
+func TestIssue81821(t *testing.T) {
+	tmpl := Must(New("test").Parse("<script>const s = `${1}${/{{.}}/g}`</script>"))
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, `x/.exec(alert(1))}`); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	want := "<script>const s = `${1}${/x\\/\\.exec\\(alert\\(1\\)\\)\\}/g}`</script>"
+	if got := buf.String(); got != want {
+		t.Errorf("got:  %s\nwant: %s", got, want)
+	}
+}
+
 func TestCVE202656858(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -2318,6 +2379,52 @@ func TestCVE202656858(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpl := Must(New("test").Parse(tt.tmpl))
 			var buf bytes.Buffer
+			if err := tmpl.Execute(&buf, tt.input); err != nil {
+				t.Fatalf("Execute: %v", err)
+			}
+			if got := buf.String(); got != tt.want {
+				t.Errorf("got:  %s\nwant: %s", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIssue81823(t *testing.T) {
+	tests := []struct {
+		name  string
+		tmpl  string
+		input string
+		want  string
+	}{
+		{
+			name:  "yield",
+			tmpl:  `<script>function* rules(){yield /{{.}}/g}</script>`,
+			input: `/;alert(1)//`,
+			want:  `<script>function* rules(){yield /\/;alert\(1\)\/\//g}</script>`,
+		},
+		{
+			name:  "property yield",
+			tmpl:  "<script>const pct = bond.yield / 100;\nconst user = {{.}}; // state\n</script>",
+			input: `1;pwned=1;0`,
+			want:  "<script>const pct = bond.yield / 100;\nconst user = \"1;pwned=1;0\"; \n</script>",
+		},
+		{
+			name:  "private yield",
+			tmpl:  "<script>class Bond { #yield = 4; pct() { return this.#yield / 100; } }\nconst user = {{.}}; // state\n</script>",
+			input: `1;pwned=1;0`,
+			want:  "<script>class Bond { #yield = 4; pct() { return this.#yield / 100; } }\nconst user = \"1;pwned=1;0\"; \n</script>",
+		},
+		{
+			name:  "property in",
+			tmpl:  "<script>const kb = traffic.in / 1024;\nconst user = {{.}}; // state\n</script>",
+			input: `1;pwned=1;0`,
+			want:  "<script>const kb = traffic.in / 1024;\nconst user = \"1;pwned=1;0\"; \n</script>",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpl := Must(New("test").Parse(tt.tmpl))
+			var buf strings.Builder
 			if err := tmpl.Execute(&buf, tt.input); err != nil {
 				t.Fatalf("Execute: %v", err)
 			}

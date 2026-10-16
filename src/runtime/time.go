@@ -1302,10 +1302,6 @@ func (ts *timers) verify() {
 			throw("bad timer heap")
 		}
 	}
-	if n := int(ts.len.Load()); len(ts.heap) != n {
-		println("timer heap len", len(ts.heap), "!= atomic len", n)
-		throw("bad timer heap len")
-	}
 }
 
 // updateMinWhenHeap sets ts.minWhenHeap to ts.heap[0].when.
@@ -1473,13 +1469,19 @@ func (t *timer) maybeRunChan(c *hchan) {
 	}
 
 	t.lock()
-	now := nanotime()
+	if t.state&timerHeaped != 0 || t.when == 0 {
+		t.trace("maybeRunChan-")
+		t.unlock()
+		return
+	}
+	var now int64
 	if t.isFake {
 		now = getg().bubble.now
+	} else {
+		now = nanotime()
 	}
-	if t.state&timerHeaped != 0 || t.when == 0 || t.when > now {
+	if t.when > now {
 		t.trace("maybeRunChan-")
-		// Timer in the heap, or not running at all, or not triggered.
 		t.unlock()
 		return
 	}

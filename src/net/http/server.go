@@ -1406,7 +1406,11 @@ func (cw *chunkWriter) writeHeader(p []byte) {
 
 	w := cw.res
 	keepAlivesEnabled := w.conn.server.doKeepAlives()
-	isHEAD := w.req.Method == "HEAD"
+
+	// Consult w.conn.lastMethod instead of w.req.Method,
+	// just in case a middleware layer modified w.req.
+	isHEAD := w.conn.lastMethod == "HEAD"
+	isCONNECT := w.conn.lastMethod == "CONNECT"
 
 	// header is written out to w.conn.buf below. Depending on the
 	// state of the handler, we either own the map or not. If we
@@ -1518,6 +1522,11 @@ func (cw *chunkWriter) writeHeader(p []byte) {
 		w.closeAfterReply = true
 	}
 
+	if isCONNECT {
+		// Don't reuse a connection after a CONNECT, even if we reject it.
+		w.closeAfterReply = true
+	}
+
 	// We do this by default because there are a number of clients that
 	// send a full request before starting to read the response, and they
 	// can deadlock if we start writing the response with unconsumed body
@@ -1592,7 +1601,13 @@ func (cw *chunkWriter) writeHeader(p []byte) {
 		hasCL = false
 	}
 
-	if w.req.Method == "HEAD" || !bodyAllowedForStatus(code) || code == StatusNoContent {
+	isSuccessfulCONNECT := isCONNECT && code >= 200 && code < 300
+	if isSuccessfulCONNECT {
+		// Tunnel established, connection is no longer HTTP.
+		delHeader("Transfer-Encoding")
+		delHeader("Content-Length")
+		setHeader.contentLength = nil
+	} else if isHEAD || !bodyAllowedForStatus(code) || code == StatusNoContent {
 		// Response has no body.
 		delHeader("Transfer-Encoding")
 	} else if hasCL {
@@ -1642,8 +1657,13 @@ func (cw *chunkWriter) writeHeader(p []byte) {
 		!isProtocolSwitchResponse(w.status, header)
 	if delConnectionHeader {
 		delHeader("Connection")
-		if w.req.ProtoAtLeast(1, 1) {
+		// Don't set Connection: close on a 2xx CONNECT response,
+		// even though we will close the connection if the handler doesn't hijack it.
+		// If the handler does hijack the connection, the Connection: close is confusing.
+		if w.req.ProtoAtLeast(1, 1) && !isSuccessfulCONNECT {
 			setHeader.connection = "close"
+		} else {
+			setHeader.connection = ""
 		}
 	}
 
@@ -3244,9 +3264,12 @@ type Server struct {
 	// MaxHeaderValueCount controls the maximum number of header
 	// values that the server is willing to parse from a request.
 	// If zero, DefaultMaxHeaderValueCount is used.
-	// Note that comma-separated values in a single header line are
-	// counted once, while values sent as multiple header lines are
-	// counted multiple times.
+	// Comma-separated values in a single header line are counted
+	// once, while values sent as multiple header lines are
+	// counted multiple times. An exception to this is the Trailer
+	// header, whose comma-separated values are counted separately,
+	// as each of them is expected to be received later as an
+	// individual trailer header line.
 	MaxHeaderValueCount int
 
 	// TLSNextProto optionally specifies a function to take over
@@ -3659,7 +3682,7 @@ var ErrServerClosed = errors.New("http: Server closed")
 // After [Server.Shutdown] or [Server.Close], the returned error is [ErrServerClosed].
 func (s *Server) Serve(l net.Listener) error {
 	// This is the sneaky path we use to let x/net/http2 wrap an http.Server
-	// and x/net/http3 install an HTTP/3 implementation:
+	// and net/http/internal/http3 install an HTTP/3 implementation:
 	// http2.ConfigureServer calls http.Server.Serve with a net.Listener that
 	// implements a certain interface, which we recognize here as an attempt
 	// to associate an http2.Server with us.
@@ -3998,9 +4021,9 @@ func ListenAndServeTLS(addr, certFile, keyFile string, handler Handler) error {
 // supports HTTP/3, allowing an external implementation of HTTP/3 to be used
 // via net/http. See https://go.dev/issue/77440 for details.
 //
-// This is currently only used with golang.org/x/net/internal/http3, to allow
-// us to test our HTTP/3 implementation against tests in net/http. HTTP/3 is
-// not yet accessible to end-users.
+// This is currently only used with net/http/internal/http3, to allow us to
+// test our HTTP/3 implementation against tests in net/http. HTTP/3 is not yet
+// accessible to end-users.
 type http3ServerHandler struct {
 	handler     serverHandler
 	tlsConfig   *tls.Config
@@ -4125,7 +4148,7 @@ var http2server = godebug.New("http2server")
 // configured otherwise. (by setting s.TLSNextProto non-nil)
 // It must only be called via s.nextProtoOnce (use s.setupHTTP2_*).
 func (s *Server) onceSetNextProtoDefaults() {
-	if omitBundledHTTP2 {
+	if omitHTTP2Server {
 		return
 	}
 	p := s.protocols()

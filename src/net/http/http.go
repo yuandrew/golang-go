@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
-	_ "unsafe"
 
 	"golang.org/x/net/http/httpguts"
 )
@@ -61,9 +60,6 @@ func (p Protocols) http3() bool { return p.bits&protoHTTP3 != 0 }
 // setHTTP3 adds or removes HTTP/3 from p.
 func (p *Protocols) setHTTP3(ok bool) { p.setBit(protoHTTP3, ok) }
 
-//go:linkname protocolSetHTTP3 golang.org/x/net/internal/http3_test.protocolSetHTTP3
-func protocolSetHTTP3(p *Protocols) { p.setHTTP3(true) }
-
 func (p *Protocols) setBit(bit uint8, ok bool) {
 	if ok {
 		p.bits |= bit
@@ -106,11 +102,6 @@ const maxInt64 = 1<<63 - 1
 // aLongTimeAgo is a non-zero time, far in the past, used for
 // immediate cancellation of network operations.
 var aLongTimeAgo = time.Unix(1, 0)
-
-// omitBundledHTTP2 is set by omithttp2.go when the nethttpomithttp2
-// build tag is set. That means h2_bundle.go isn't compiled in and we
-// shouldn't try to use it.
-var omitBundledHTTP2 bool
 
 // TODO(bradfitz): move common stuff here. The other files have accumulated
 // generic http stuff in random places.
