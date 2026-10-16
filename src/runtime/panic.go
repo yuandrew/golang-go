@@ -680,6 +680,12 @@ func deferreturn() {
 //
 // It crashes if called from a thread not created by the Go runtime.
 func Goexit() {
+	if b := getg().bubble; b != nil && b.deterministic != nil && b.deterministic.randomActive {
+		panic("runtime/bubble: random source must return")
+	}
+	if b := getg().bubble; b != nil && b.deterministic != nil && b.deterministic.delivering {
+		panic(errorString("runtime/bubble: delivery callback must return"))
+	}
 	// Create a panic object for Goexit, so we can recognize when it might be
 	// bypassed by a recover().
 	var p _panic
@@ -857,6 +863,23 @@ func gopanic(e any) {
 			break
 		}
 		fn()
+	}
+
+	if b := gp.bubble; b != nil && b.deterministic != nil && gp != b.root {
+		// User defers and recover keep ordinary semantics. An unrecovered
+		// bubble panic becomes a host fault without formatting user objects.
+		d := b.deterministic
+		if d.failure == "" {
+			d.failure = "user goroutine panic (non-string value)"
+			if message, ok := e.(string); ok {
+				const maxMessage = 256
+				if len(message) > maxMessage {
+					message = message[:maxMessage]
+				}
+				d.failure = "user goroutine panic: " + message
+			}
+		}
+		deterministicExit()
 	}
 
 	// If we're tracing, flush the current generation to make the trace more

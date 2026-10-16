@@ -10,17 +10,19 @@ import (
 	"unsafe"
 )
 
-// A synctestBubble is a set of goroutines started by synctest.Run.
+// A synctestBubble groups goroutines and a logical clock for testing/synctest
+// and host-controlled runtime/bubble execution.
 type synctestBubble struct {
-	mu      mutex
-	timers  timers
-	id      uint64 // unique id
-	now     int64  // current fake time
-	root    *g     // caller of synctest.Run
-	waiter  *g     // caller of synctest.Wait
-	main    *g     // goroutine started by synctest.Run
-	waiting bool   // true if a goroutine is calling synctest.Wait
-	done    bool   // true if main has exited
+	deterministic *deterministicBubble // nil for ordinary testing/synctest bubbles
+	mu            mutex
+	timers        timers
+	id            uint64 // unique id
+	now           int64  // current fake time
+	root          *g     // caller of synctest.Run or current host controller
+	waiter        *g     // caller of synctest.Wait
+	main          *g     // initial user goroutine
+	waiting       bool   // true if a goroutine is calling synctest.Wait
+	done          bool   // true if main has exited
 
 	// The bubble is active (not blocked) so long as running > 0 || active > 0.
 	//
@@ -125,12 +127,21 @@ func (bubble *synctestBubble) decActive() {
 	unlock(&bubble.mu)
 	if wake != nil {
 		goready(wake, 0)
+	} else if bubble.deterministic != nil {
+		bubble.deterministicFaultWake()
 	}
 }
 
 // maybeWakeLocked returns a g to wake if the bubble is durably blocked.
 func (bubble *synctestBubble) maybeWakeLocked() *g {
 	if bubble.running > 0 || bubble.active > 0 {
+		return nil
+	}
+	if d := bubble.deterministic; d != nil {
+		if d.stepping && d.waiting {
+			d.waiting = false
+			return bubble.root
+		}
 		return nil
 	}
 	// Increment the bubble active count, since we've determined to wake something.
@@ -282,6 +293,9 @@ func synctestWait() {
 	gp := getg()
 	if gp.bubble == nil {
 		panic("goroutine is not in a bubble")
+	}
+	if gp.bubble.deterministic != nil {
+		panic("synctest.Wait is not supported in runtime/bubble")
 	}
 	lock(&gp.bubble.mu)
 	// We use a bubble.waiting bool to detect simultaneous calls to Wait rather than

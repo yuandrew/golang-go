@@ -586,6 +586,9 @@ func notifyListAdd(l *notifyList) uint32 {
 //
 //go:linkname notifyListWait sync.runtime_notifyListWait
 func notifyListWait(l *notifyList, t uint32) {
+	if b := getg().bubble; b != nil && b.deterministic != nil {
+		panic(errorString("runtime/bubble: sync.Cond waits are not supported"))
+	}
 	lockWithRank(&l.lock, lockRankNotifyList)
 
 	// Return right away if this ticket has already been notified.

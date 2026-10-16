@@ -67,8 +67,28 @@ type timer struct {
 	isChan bool         // timer has a channel; immutable; can be read without lock
 	isFake bool         // timer is using fake time; immutable; can be read without lock
 
+	// Pack scalar fields before pointers to avoid an ordinary allocation increase.
 	blocked uint32 // number of goroutines blocked on timer's channel
 	rand    uint32 // randomizes order of timers at same instant; only set when isFake
+
+	// isSending is used to handle races between running a
+	// channel timer and stopping or resetting the timer.
+	// It is used only for channel timers (t.isChan == true).
+	// It is not used for tickers.
+	// The value is incremented when about to send a value on the channel,
+	// and decremented after sending the value.
+	// The stop/reset code uses this to detect whether it
+	// stopped the channel send.
+	//
+	// isSending is incremented only when t.mu is held.
+	// isSending is decremented only when t.sendLock is held.
+	// isSending is read only when both t.mu and t.sendLock are held.
+	isSending atomic.Int32
+
+	// Host-controlled timers never enter a timer heap. This immutable pointer
+	// is nil for ordinary timers; registration metadata is allocated only for
+	// timers belonging to deterministic bubbles.
+	deterministic *deterministicTimer
 
 	// Timer wakes up at when, and then at when+period, ... (period > 0 only)
 	// each time calling f(arg, seq, delay) in the timer goroutine, so f must be
@@ -106,20 +126,6 @@ type timer struct {
 
 	// sendLock protects sends on the timer's channel.
 	sendLock mutex
-
-	// isSending is used to handle races between running a
-	// channel timer and stopping or resetting the timer.
-	// It is used only for channel timers (t.isChan == true).
-	// It is not used for tickers.
-	// The value is incremented when about to send a value on the channel,
-	// and decremented after sending the value.
-	// The stop/reset code uses this to detect whether it
-	// stopped the channel send.
-	//
-	// isSending is incremented only when t.mu is held.
-	// isSending is decremented only when t.sendLock is held.
-	// isSending is read only when both t.mu and t.sendLock are held.
-	isSending atomic.Int32
 }
 
 // init initializes a newly allocated timer t.
@@ -338,12 +344,18 @@ func timeSleep(ns int64) {
 	}
 
 	gp := getg()
+	if b := gp.bubble; b != nil && b.deterministic != nil && b.now == maxWhen {
+		panic(errorString("runtime/bubble: cannot schedule timers at the clock limit"))
+	}
 	t := gp.timer
 	if t == nil {
 		t = new(timer)
 		t.init(goroutineReady, gp)
 		if gp.bubble != nil {
 			t.isFake = true
+			if gp.bubble.deterministic != nil {
+				t.deterministicRegister(gp.bubble)
+			}
 		}
 		gp.timer = t
 	}
@@ -408,6 +420,12 @@ func newTimer(when, period int64, f func(arg any, seq uintptr, delay int64), arg
 	}
 	if bubble := getg().bubble; bubble != nil {
 		t.isFake = true
+		if bubble.deterministic != nil {
+			if period != 0 {
+				panic(errorString("runtime/bubble: Ticker is unsupported"))
+			}
+			t.deterministicRegister(bubble)
+		}
 	}
 	t.modify(when, period, f, arg, 0)
 	t.self = t
@@ -419,6 +437,9 @@ func newTimer(when, period int64, f func(arg any, seq uintptr, delay int64), arg
 //
 //go:linkname stopTimer time.stopTimer
 func stopTimer(t *timeTimer) bool {
+	if t.deterministic != nil || getg().bubble != nil {
+		t.deterministicCheckOwner()
+	}
 	if t.isFake && getg().bubble == nil {
 		fatal("stop of synctest timer from outside bubble")
 	}
@@ -431,6 +452,9 @@ func stopTimer(t *timeTimer) bool {
 //
 //go:linkname resetTimer time.resetTimer
 func resetTimer(t *timeTimer, when, period int64) bool {
+	if t.deterministic != nil || getg().bubble != nil {
+		t.deterministicCheckOwner()
+	}
 	if raceenabled {
 		racerelease(unsafe.Pointer(&t.timer))
 	}
@@ -513,6 +537,9 @@ func (t *timer) stop() bool {
 			pending = true
 		}
 	}
+	if t.deterministic != nil {
+		t.deterministicDisarm()
+	}
 
 	return pending
 }
@@ -547,6 +574,17 @@ func (ts *timers) deleteMin() {
 // Reports whether the timer was modified before it was run.
 // If f == nil, then t.f, t.arg, and t.seq are not modified.
 func (t *timer) modify(when, period int64, f func(arg any, seq uintptr, delay int64), arg any, seq uintptr) bool {
+	if t.deterministic != nil {
+		t.deterministicCheckOwner()
+		if t.deterministic.owner.now == maxWhen {
+			// time.when saturates additions. At the endpoint it no longer
+			// distinguishes positive durations from immediately-ready timers.
+			panic(errorString("runtime/bubble: cannot schedule timers at the clock limit"))
+		}
+		if period != 0 {
+			panic(errorString("runtime/bubble: periodic timers are unsupported"))
+		}
+	}
 	if when <= 0 {
 		throw("timer when must be positive")
 	}
@@ -646,6 +684,9 @@ func (t *timer) modify(when, period int64, f func(arg any, seq uintptr, delay in
 	if wake {
 		wakeNetPoller(when)
 	}
+	if t.deterministic != nil {
+		t.deterministicModified(when)
+	}
 
 	return pending
 }
@@ -654,6 +695,9 @@ func (t *timer) modify(when, period int64, f func(arg any, seq uintptr, delay in
 // t must be locked.
 func (t *timer) needsAdd() bool {
 	assertLockHeld(&t.mu)
+	if t.deterministic != nil {
+		return false
+	}
 	need := t.state&timerHeaped == 0 && t.when > 0 && (!t.isChan || t.blocked > 0)
 	if need {
 		t.trace("needsAdd+")
@@ -682,6 +726,9 @@ func (t *timer) needsAdd() bool {
 // may result in concurrent calls to t.maybeAdd,
 // so we cannot assume that t is not in a heap on entry to t.maybeAdd.
 func (t *timer) maybeAdd() {
+	if t.deterministic != nil {
+		return
+	}
 	// Note: Not holding any locks on entry to t.maybeAdd,
 	// so the current g can be rescheduled to a different M and P
 	// at any time, including between the ts := assignment and the
@@ -1409,6 +1456,11 @@ func (t *timer) maybeRunChan(c *hchan) {
 	if t.isFake && getg().bubble != c.bubble {
 		// This should have been checked by the caller, but check just in case.
 		fatal("synctest timer accessed from outside bubble")
+	}
+	if t.deterministic != nil {
+		// Advancing the clock does not authorize a timer send. Only the
+		// host's FireTimer call can make this channel ready.
+		return
 	}
 	if t.astate.Load()&timerHeaped != 0 {
 		// If the timer is in the heap, the ordinary timer code

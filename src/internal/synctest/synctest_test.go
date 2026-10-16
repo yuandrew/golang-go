@@ -428,6 +428,25 @@ func TestChannelMovedOutOfBubble(t *testing.T) {
 			close(ch)
 		},
 		wantFatal: "close of synctest channel from outside bubble",
+	}, {
+		desc: "select",
+		f: func(ch chan struct{}) {
+			select {
+			case <-ch:
+			case <-make(chan struct{}):
+			default:
+			}
+		},
+		wantFatal: "select on synctest channel from outside bubble",
+	}, {
+		desc: "reflect select",
+		f: func(ch chan struct{}) {
+			reflect.Select([]reflect.SelectCase{
+				{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(ch)},
+				{Dir: reflect.SelectDefault},
+			})
+		},
+		wantFatal: "select on synctest channel from outside bubble",
 	}} {
 		t.Run(test.desc, func(t *testing.T) {
 			// Bubbled channel accessed from outside any bubble.
