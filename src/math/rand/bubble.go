@@ -14,8 +14,8 @@ func newBubbleRand() any {
 }
 
 // bubbleSource adapts a bubble's application uint64 stream to the legacy API.
-// The runtime synchronizes source draws. Read separately protects the Rand's
-// byte buffer, including calls which consume no new source word.
+// The configured bubble callback synchronizes source draws. Read separately
+// protects the Rand's byte buffer, including calls which consume no source word.
 type bubbleSource struct {
 	readMu sync.Mutex
 }

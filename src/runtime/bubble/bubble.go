@@ -10,11 +10,13 @@
 // the host. Separate bubbles may run concurrently.
 //
 // The supported synchronization primitives are owned channels, select, and
-// runtime.Gosched. Native Sleep and positive channel or callback timers require
-// explicit host timer authorization. Nonpositive timers become ready locally.
+// runtime.Gosched. time.Now observes the logical clock. time.Sleep and positive
+// one-shot channel timers require explicit host timer authorization. Nonpositive
+// timers become ready locally.
 // This is not a memory sandbox: callers must avoid ambient I/O,
-// shared mutable state, map-dependent ordering, and other nondeterministic
-// inputs. General sync, context, and Ticker support is not promised.
+// mutable state shared across concurrent execution domains, map-dependent
+// ordering, and other nondeterministic inputs. General sync, context, Ticker,
+// and callback-timer support is outside the replay contract.
 // Explicit runtime.GC calls, iterator coroutine transfers, and sync.Cond waits
 // inside the bubble are rejected. Garbage collection initiated by the host is
 // allowed.
@@ -39,6 +41,10 @@
 // returns immediately. Timers armed before that timestamp may still be stopped
 // or delivered there. This restriction prevents duration saturation from making
 // a positive timer appear immediately ready without host authorization.
+//
+// Replay requires the same program, initial configuration and ordered host
+// inputs under a compatible implementation. Matching protocol names do not
+// guarantee compatibility across Go versions.
 package bubble
 
 import (
@@ -51,12 +57,15 @@ import (
 	"time"
 )
 
-// RangeProtocol selects the range-retirement execution policy.
+// RangeProtocol selects cooperative scheduling with timer range retirement.
+// It does not by itself guarantee replay compatibility across Go versions.
 const RangeProtocol = "cooperative-v3-ranges"
 
 // Options configures a new bubble. Seed zero is a reproducible seed.
 type Options struct {
-	Protocol  string
+	// Protocol selects the execution policy. Empty selects RangeProtocol.
+	Protocol string
+	// StartTime sets the logical clock. Zero selects 2000-01-01 UTC.
 	StartTime time.Time
 	// Seed controls scheduler choices and seeds the default application source.
 	// Supplying RandomSource changes only application randomness.
@@ -73,7 +82,7 @@ type Options struct {
 	RandomSource rand.Source
 }
 
-// Bubble is a paused or running deterministic execution. It must not be copied.
+// Bubble represents a host-controlled deterministic execution. It must not be copied.
 // Its controller methods reject concurrent use and calls from inside any bubble.
 type Bubble struct {
 	busy    atomic.Bool
@@ -102,7 +111,7 @@ const (
 	Quiescent Status = iota
 	// Completed means every user goroutine has exited.
 	Completed
-	// Faulted means a delivery callback or unrecovered user goroutine panicked.
+	// Faulted means an unrecovered panic escaped a delivery callback or user goroutine.
 	Faulted
 )
 
@@ -115,11 +124,16 @@ type State struct {
 	TimerChanges   []TimerChange
 }
 
+// TimerID identifies a timer within one bubble. Acknowledged IDs are not reused.
 type TimerID uint64
+
+// TimerChangeKind describes a timer registration change reported by Step.
 type TimerChangeKind uint8
 
 const (
+	// TimerArmed records a positive timer awaiting host authorization.
 	TimerArmed TimerChangeKind = iota
+	// TimerDisarmed records cancellation of an armed timer by Stop or Reset.
 	TimerDisarmed
 )
 
@@ -154,6 +168,7 @@ func (d *Delivery) FireTimer(id TimerID, generation uint64) bool {
 // RetireTimerRange acknowledges inclusive inactive IDs under RangeProtocol.
 // Unknown IDs, reversed ranges and active timers reject before mutation.
 // Late positive generations are ignored; Reset allocates a fresh ID.
+// Acknowledgments are host inputs and must be reproduced in order during replay.
 func (d *Delivery) RetireTimerRange(first, last TimerID) {
 	if d == nil || !d.active.Load() {
 		panic("bubble: delivery is no longer active")
@@ -225,9 +240,14 @@ func (b *Bubble) enter() error {
 	return nil
 }
 
-// Step applies a batch and runs to quiescence or completion. Validation errors
-// leave the bubble usable. Completed, faulted, and closed bubbles reject Step.
+// Step applies a batch and runs to quiescence, completion or a terminal fault.
+// Validation errors leave the bubble usable. Completed, faulted, and closed
+// bubbles reject Step.
 // Advancing the clock never by itself authorizes a positive timer to fire.
+// A delivery panic or unrecovered user panic returns a terminal fault. Delivery
+// mutations and consumed inputs are not rolled back.
+// Returned errors do not preserve the original panic value. Panic diagnostics
+// are bounded, and user formatting methods are not called.
 func (b *Bubble) Step(a Activation) (state State, err error) {
 	if err := b.enter(); err != nil {
 		return State{}, err

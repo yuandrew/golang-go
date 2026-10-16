@@ -5385,7 +5385,7 @@ func newproc(fn *funcval) {
 		systemstack(func() {
 			newg = newproc1(fn, gp, pc, false, waitReasonZero)
 		})
-		// Keep membership allocation on the executing goroutine's stack.
+		// Register before enqueueing so the goroutine cannot run untracked.
 		if newg.bubble == b {
 			b.deterministic.deterministicTrack(newg)
 		}

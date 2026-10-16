@@ -27,7 +27,7 @@ func BenchmarkClosePaused(b *testing.B) {
 			b.ResetTimer()
 			for range b.N {
 				b.StopTimer()
-				workflow, err := bubble.New(bubble.Options{}, func() {
+				execution, err := bubble.New(bubble.Options{}, func() {
 					for range ownedWaits {
 						go func() { select {} }()
 					}
@@ -35,11 +35,11 @@ func BenchmarkClosePaused(b *testing.B) {
 				if err != nil {
 					b.Fatal(err)
 				}
-				if _, err := workflow.Step(bubble.Activation{}); err != nil {
+				if _, err := execution.Step(bubble.Activation{}); err != nil {
 					b.Fatal(err)
 				}
 				b.StartTimer()
-				if err := workflow.Close(); err != nil {
+				if err := execution.Close(); err != nil {
 					b.Fatal(err)
 				}
 			}

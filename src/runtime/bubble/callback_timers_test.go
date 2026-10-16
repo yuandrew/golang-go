@@ -12,13 +12,14 @@ import (
 	"time"
 )
 
-const candidateInterval = time.Second
+// Callback-timer compatibility does not imply general context replay support.
+const callbackDelay = time.Second
 
-func TestCandidateTickerRejected(t *testing.T) {
+func TestTickerRejected(t *testing.T) {
 	var recovered any
 	b, _ := bubble.New(bubble.Options{}, func() {
 		defer func() { recovered = recover() }()
-		time.NewTicker(candidateInterval)
+		time.NewTicker(callbackDelay)
 	})
 	s, err := b.Step(bubble.Activation{})
 	if err != nil || recovered == nil || s.Status != bubble.Completed {
@@ -29,7 +30,7 @@ func TestCandidateTickerRejected(t *testing.T) {
 	}
 }
 
-func TestCandidateAfterFunc(t *testing.T) {
+func TestAfterFuncBlockingCallback(t *testing.T) {
 	var trace []string
 	var gate chan struct{}
 	var timer *time.Timer
@@ -38,7 +39,7 @@ func TestCandidateAfterFunc(t *testing.T) {
 		defer func() { recovered = recover() }()
 		gate = make(chan struct{})
 		done := make(chan struct{})
-		timer = time.AfterFunc(candidateInterval, func() {
+		timer = time.AfterFunc(callbackDelay, func() {
 			trace = append(trace, "begin")
 			<-gate
 			trace = append(trace, "end")
@@ -58,7 +59,7 @@ func TestCandidateAfterFunc(t *testing.T) {
 	}
 	c := s.TimerChanges[0]
 	// Advancing time alone must never start a callback.
-	s, err = b.Step(bubble.Activation{Now: c.Deadline.Add(candidateInterval)})
+	s, err = b.Step(bubble.Activation{Now: c.Deadline.Add(callbackDelay)})
 	if err != nil || len(trace) != 0 {
 		t.Fatalf("unauthorized: %v %v", err, trace)
 	}
@@ -90,13 +91,13 @@ func TestCandidateAfterFunc(t *testing.T) {
 	}
 }
 
-func TestCandidateResetStop(t *testing.T) {
+func TestAfterFuncResetStop(t *testing.T) {
 	var timer *time.Timer
 	var calls int
 	var recovered any
 	b, _ := bubble.New(bubble.Options{}, func() {
 		defer func() { recovered = recover() }()
-		timer = time.AfterFunc(candidateInterval, func() { calls++ })
+		timer = time.AfterFunc(callbackDelay, func() { calls++ })
 		select {}
 	})
 	s, err := b.Step(bubble.Activation{})
@@ -105,7 +106,7 @@ func TestCandidateResetStop(t *testing.T) {
 	}
 	old := s.TimerChanges[0]
 	s, err = b.Step(bubble.Activation{Deliver: func(d *bubble.Delivery) {
-		if !timer.Reset(2 * candidateInterval) {
+		if !timer.Reset(2 * callbackDelay) {
 			t.Error("active Reset returned false")
 		}
 	}})
@@ -123,7 +124,7 @@ func TestCandidateResetStop(t *testing.T) {
 		if d.FireTimer(next.ID, next.Generation) {
 			t.Error("stopped generation accepted")
 		}
-		if timer.Reset(candidateInterval) {
+		if timer.Reset(callbackDelay) {
 			t.Error("inactive Reset returned true")
 		}
 	}})
@@ -140,14 +141,14 @@ func TestCandidateResetStop(t *testing.T) {
 	}
 }
 
-func TestCandidateImmediate(t *testing.T) {
+func TestAfterFuncImmediate(t *testing.T) {
 	var trace []string
 	var recovered any
 	b, _ := bubble.New(bubble.Options{}, func() {
 		defer func() { recovered = recover() }()
 		events := make(chan string, 2)
 		time.AfterFunc(0, func() { events <- "zero" })
-		time.AfterFunc(-candidateInterval, func() { events <- "negative" })
+		time.AfterFunc(-callbackDelay, func() { events <- "negative" })
 		trace = append(trace, "root")
 		trace = append(trace, <-events, <-events)
 	})
@@ -163,15 +164,15 @@ func TestCandidateImmediate(t *testing.T) {
 	}
 }
 
-func TestCandidateCallbackOrder(t *testing.T) {
+func TestAfterFuncCallbackOrder(t *testing.T) {
 	var trace []string
 	var recovered any
 	b, _ := bubble.New(bubble.Options{}, func() {
 		defer func() { recovered = recover() }()
 		done := make(chan struct{})
 		events := make(chan string, 2)
-		time.AfterFunc(candidateInterval, func() { events <- "first"; close(done) })
-		time.AfterFunc(candidateInterval, func() { events <- "second" })
+		time.AfterFunc(callbackDelay, func() { events <- "first"; close(done) })
+		time.AfterFunc(callbackDelay, func() { events <- "second" })
 		<-done
 		trace = append(trace, <-events, <-events)
 	})
@@ -195,13 +196,13 @@ func TestCandidateCallbackOrder(t *testing.T) {
 	}
 }
 
-func TestCandidateImmediateReset(t *testing.T) {
+func TestAfterFuncImmediateReset(t *testing.T) {
 	var calls int
 	var recovered any
 	b, _ := bubble.New(bubble.Options{}, func() {
 		defer func() { recovered = recover() }()
 		done := make(chan struct{})
-		timer := time.AfterFunc(candidateInterval, func() { close(done) })
+		timer := time.AfterFunc(callbackDelay, func() { close(done) })
 		if !timer.Reset(0) {
 			panic("active reset returned false")
 		}
@@ -220,12 +221,12 @@ func TestCandidateImmediateReset(t *testing.T) {
 	}
 }
 
-func TestCandidateDeadline(t *testing.T) {
+func TestAfterFuncContextDeadline(t *testing.T) {
 	var got error
 	var recovered any
 	b, _ := bubble.New(bubble.Options{}, func() {
 		defer func() { recovered = recover() }()
-		ctx, cancel := context.WithTimeout(context.Background(), candidateInterval)
+		ctx, cancel := context.WithTimeout(context.Background(), callbackDelay)
 		defer cancel()
 		<-ctx.Done()
 		got = ctx.Err()
@@ -244,7 +245,7 @@ func TestCandidateDeadline(t *testing.T) {
 	}
 }
 
-func TestCandidateCallbackReset(t *testing.T) {
+func TestAfterFuncCallbackReset(t *testing.T) {
 	var timer *time.Timer
 	var gate chan struct{}
 	var begun, finished int
@@ -253,7 +254,7 @@ func TestCandidateCallbackReset(t *testing.T) {
 		defer func() { recovered = recover() }()
 		gate = make(chan struct{})
 		done := make(chan struct{}, 2)
-		timer = time.AfterFunc(candidateInterval, func() {
+		timer = time.AfterFunc(callbackDelay, func() {
 			begun++
 			<-gate
 			done <- struct{}{}
@@ -273,7 +274,7 @@ func TestCandidateCallbackReset(t *testing.T) {
 		t.Fatalf("first: %v %d %d", err, begun, finished)
 	}
 	s, err = b.Step(bubble.Activation{Deliver: func(d *bubble.Delivery) {
-		if timer.Reset(candidateInterval) {
+		if timer.Reset(callbackDelay) {
 			t.Error("running callback Reset returned true")
 		}
 	}})

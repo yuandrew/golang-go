@@ -11,9 +11,9 @@
 //
 // Top-level functions, such as [Float64] and [Int],
 // are safe for concurrent use by multiple goroutines.
-// Inside a deterministic bubble, top-level functions use the bubble's configured
-// application random source and a bubble-local Read buffer.
-// Generators constructed with New continue to use their explicit sources.
+// Inside an execution created by runtime/bubble, top-level functions use its
+// configured application random source and a bubble-local Read buffer.
+// Generators constructed with New use their explicit sources.
 //
 // This package's outputs might be easily predictable regardless of how it's
 // seeded. For random numbers suitable for security-sensitive work, see the

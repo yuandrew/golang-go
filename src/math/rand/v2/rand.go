@@ -11,8 +11,8 @@
 //
 // Top-level functions, such as [Float64] and [Int],
 // are safe for concurrent use by multiple goroutines.
-// Inside a deterministic bubble, top-level functions use the bubble's configured
-// application random source. Generators constructed with New continue to use
+// Inside an execution created by runtime/bubble, top-level functions use its
+// configured application random source. Generators constructed with New use
 // the source passed to New.
 //
 // The [ChaCha8] source is a general-purpose source resistant to prediction.

@@ -197,7 +197,7 @@ func chansend(c *hchan, ep unsafe.Pointer, block bool, callerpc uintptr) bool {
 			deterministicCheckChan(c)
 		}
 		if c.bubble != nil {
-			fatal("send on synctest channel from outside bubble")
+			fatal(c.bubble.channelAccessError("send on synctest channel from outside bubble"))
 		}
 	}
 
@@ -325,7 +325,7 @@ func chansend(c *hchan, ep unsafe.Pointer, block bool, callerpc uintptr) bool {
 func send(c *hchan, sg *sudog, ep unsafe.Pointer, unlockf func(), skip int) {
 	if c.bubble != nil && getg().bubble != c.bubble {
 		unlockf()
-		fatal("send on synctest channel from outside bubble")
+		fatal(c.bubble.channelAccessError("send on synctest channel from outside bubble"))
 	}
 	if raceenabled {
 		if c.dataqsiz == 0 {
@@ -428,7 +428,7 @@ func closechan(c *hchan) {
 			deterministicCheckChan(c)
 		}
 		if c.bubble != nil {
-			fatal("close of synctest channel from outside bubble")
+			fatal(c.bubble.channelAccessError("close of synctest channel from outside bubble"))
 		}
 	}
 
@@ -566,7 +566,7 @@ func chanrecv(c *hchan, ep unsafe.Pointer, block bool) (selected, received bool)
 			deterministicCheckChan(c)
 		}
 		if c.bubble != nil {
-			fatal("receive on synctest channel from outside bubble")
+			fatal(c.bubble.channelAccessError("receive on synctest channel from outside bubble"))
 		}
 	}
 
@@ -731,7 +731,7 @@ func chanrecv(c *hchan, ep unsafe.Pointer, block bool) (selected, received bool)
 func recv(c *hchan, sg *sudog, ep unsafe.Pointer, unlockf func(), skip int) {
 	if c.bubble != nil && getg().bubble != c.bubble {
 		unlockf()
-		fatal("receive on synctest channel from outside bubble")
+		fatal(c.bubble.channelAccessError("receive on synctest channel from outside bubble"))
 	}
 	if c.dataqsiz == 0 {
 		if raceenabled {

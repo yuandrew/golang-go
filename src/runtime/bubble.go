@@ -147,7 +147,7 @@ func (b *synctestBubble) deterministicFaultWake() {
 	}
 }
 
-// deterministicSelect implements cooperative-v1's private SplitMix64 stream
+// deterministicSelect uses a private SplitMix64 stream
 // and rejection sampling. It is only consumed by the logical owner, never by
 // runtime housekeeping or application randomness.
 func (b *synctestBubble) deterministicSelect(n uint32) uint32 {
@@ -165,13 +165,22 @@ func (b *synctestBubble) deterministicSelect(n uint32) uint32 {
 	}
 }
 
+const deterministicChannelAccessError = "runtime/bubble: channel belongs to another execution domain"
+
+func (b *synctestBubble) channelAccessError(legacy string) string {
+	if b.deterministic != nil {
+		return deterministicChannelAccessError
+	}
+	return legacy
+}
+
 func deterministicCheckChan(c *hchan) {
 	if c == nil {
 		return
 	}
 	b := getg().bubble
 	if b != nil && b.deterministic != nil && c.bubble != b {
-		fatal("runtime/bubble: channel belongs to another execution domain")
+		fatal(deterministicChannelAccessError)
 	}
 }
 

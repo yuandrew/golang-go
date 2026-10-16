@@ -1,60 +1,75 @@
 # Host-controlled deterministic bubbles
 
-Experimental runtime prototype for design review; not an accepted Go proposal or
-a production SDK. This branch consolidates the measured candidate and tests,
-followed by API documentation changes.
+This proposal adds an opt-in execution API backed by the Go runtime. A host can
+run native concurrent Go code until it blocks, deliver ordered inputs, and resume
+execution under a reproducible scheduling policy. No new language syntax is
+proposed. The API and its restrictions remain subject to design review.
 
-## Review
+## Review order
 
-Read the [concept inventory](BUBBLE_CONCEPTS.md) to separate existing Go machinery,
-Quinn's new execution contract, our additions and private optimization policies.
+Start with the [`runtime/bubble` API](src/runtime/bubble/bubble.go) and its
+[examples](src/runtime/bubble/example_test.go). The
+[concept inventory](BUBBLE_CONCEPTS.md) separates the execution contract from
+private implementation choices. Then read the
+[scheduler and lifecycle implementation](src/runtime/bubble.go),
+[timer bookkeeping](src/runtime/bubble_time.go), and
+[application randomness bridge](src/runtime/bubble_rand.go).
 
-Quinn's baseline is `8dea6502fad43cc3ae715806fcb93e575027c8d0`.
-Compare that commit with this branch to review our additions. The imported
-candidate contains 34 source/test files identified by source hashes; its manifest
-SHA256 is `2c60cc2b4fa916cd849daf518283c6ef482a34a39bea46952e8b19cf1ea24a4b`.
-Subsequent documentation commits change no runtime behavior. Frozen measurements
-retain their original source identities.
+Behavioral tests live in [`src/runtime/bubble`](src/runtime/bubble), including
+fresh-process replay, ownership rejection, panic handling, supported paused
+discard, timer retirement, and race-detector checks.
 
-Start with [`runtime/bubble`](src/runtime/bubble/bubble.go), then the
-[runtime implementation](src/runtime/bubble.go). Tests live in
-[`src/runtime/bubble`](src/runtime/bubble).
+## Execution contract
 
-## Support and limits
+- Native descendant goroutines, owned channels and select run cooperatively.
+  A bubble runs one user goroutine at a time; separate bubbles may run concurrently.
+- The host supplies logical time and ordered input batches. Advancing time alone
+  does not authorize positive timers. Sleep and one-shot channel timers use
+  explicit timer authorization, IDs and generations.
+- Package-level math/rand and math/rand/v2 use a configured, bubble-owned source.
+  Explicit generators retain their own sources. Application draws do not change
+  select choices.
+- Unrecovered user panics are reported after normal defer/recover handling.
+  Remaining peers stay paused. A faulted execution cannot resume.
+- Close can discard supported paused execution without running user code or
+  defers. Discard is distinct from application cancellation or normal completion.
 
-- Owned native goroutines, channels and select; cooperative scheduling and yield.
-- Host-controlled logical time, Sleep and one-shot channel timers with Stop/Reset.
-- Controlled package-level math/rand and math/rand/v2 sources.
-- Scoped panic reporting and restricted discard of paused execution.
-- Timer retirement/reclamation and GC-safe channel ownership.
+The host owns recording, external effects, input ordering and reconstruction.
+The runtime does not provide durable storage, rollback or memory isolation.
+Native map iteration remains unspecified; code whose outputs depend on key order
+must sort keys explicitly. General context, WaitGroup, locks, tickers and callback
+timers are outside the initial replay contract. Callback-timer compatibility code
+and tests are present; they do not establish general context support.
 
-Hosts supply recorded inputs, timer authorization and replay policy. Temporal
-history mapping and Core adapters are separate and are not included in this Go
-branch. Native map iteration is not reproducible; command-sensitive code must
-order keys explicitly. General context, WaitGroup, locks, tickers and callback
-timers are outside the initial support promise. Experimental callback source and
-tests remain in the imported candidate.
+Close validates only the bubble's tracked goroutines and coordinates with stack
+scanning and profiling. It does not request a process-wide disposal pause.
+Ordinary runtime pauses remain possible, and StackTrace separately pauses the
+process. Unsupported waits are rejected before detachment. Active CPU loops
+cannot be interrupted. Unsupported runtime operations can still be process-fatal.
+Neither Close latency nor total retained memory has a general bound.
 
-Close skips user defers. When owned goroutines remain, disposal pauses the entire
-process, including unrelated goroutines, while inspecting and detaching supported
-states. Rejected disposal can also incur that pause; no maximum duration is
-guaranteed. Active loops cannot be interrupted. Runtime-fatal misuse remains
-process-fatal. The mechanism provides neither rollback nor memory isolation.
+## Compatibility and costs
 
-Selected CPU measurements leave one multicore representative workload
-inconclusive. General retained-memory bounds, disposal latency bounds, native
-Linux execution and future-Go replay compatibility are unproven. Replay evidence
-applies to specifically tested patched builds and programs.
+Replay requires the same program, initial configuration and ordered host inputs
+under a compatible implementation. Matching protocol names do not guarantee
+compatibility across Go versions. Hosts must establish that compatibility before
+replaying recorded executions.
+
+Tracking live goroutines and timer metadata costs memory and execution time
+inside opted-in bubbles. Runtime changes can also affect ordinary Go programs.
+Existing measurements do not establish CPU acceptance for the complete current
+implementation. Test and measurement results apply only to their recorded source,
+program and platform combinations, not arbitrary code or dependencies.
 
 ## Build and test
 
-Build this Go checkout using the repository's normal bootstrap instructions.
-Then use its toolchain to run:
+Build this checkout using the repository's normal bootstrap instructions. Then
+run the resulting toolchain:
 
 ```sh
 bin/go test runtime/bubble
 bin/go test -race runtime/bubble
 ```
 
-Stock Go does not provide this experimental package. The branch is ready for
-source review, not a claim that every Go program or dependency is supported.
+The API requires the runtime support in this change. Ordinary Go toolchains do
+not provide the proposed package.

@@ -757,7 +757,7 @@ func TestUnsupportedOperations(t *testing.T) {
 				close(external)
 			case "external-closed-receive":
 				<-external
-			case "host-receive":
+			case "host-receive", "host-send", "host-close", "host-select", "host-reflect-select":
 				owned = make(chan int, 1)
 				owned <- 42
 			case "ticker":
@@ -780,12 +780,28 @@ func TestUnsupportedOperations(t *testing.T) {
 		if _, err := b.Step(activation); err != nil {
 			t.Fatal(err)
 		}
-		if scenario == "host-receive" {
+		switch scenario {
+		case "host-receive":
 			<-owned
+		case "host-send":
+			owned <- 1
+		case "host-close":
+			close(owned)
+		case "host-select":
+			select {
+			case <-owned:
+			case <-external:
+			default:
+			}
+		case "host-reflect-select":
+			reflect.Select([]reflect.SelectCase{
+				{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(owned)},
+				{Dir: reflect.SelectDefault},
+			})
 		}
 		return
 	}
-	for _, scenario := range []string{"external-send", "external-select", "external-reflect-select", "external-close", "external-closed-receive", "host-receive", "ticker", "delivery-yield", "delivery-block"} {
+	for _, scenario := range []string{"external-send", "external-select", "external-reflect-select", "external-close", "external-closed-receive", "host-receive", "host-send", "host-close", "host-select", "host-reflect-select", "ticker", "delivery-yield", "delivery-block"} {
 		t.Run(scenario, func(t *testing.T) {
 			cmd := exec.Command(os.Args[0], "-test.run=^TestUnsupportedOperations$", "-test.timeout=10s")
 			cmd.Env = append(os.Environ(), "GO_BUBBLE_UNSUPPORTED="+scenario)
@@ -798,6 +814,11 @@ func TestUnsupportedOperations(t *testing.T) {
 			}
 			if !strings.Contains(string(output), "bubble") {
 				t.Fatalf("missing bubble diagnostic: %s", output)
+			}
+			if strings.HasPrefix(scenario, "host-") || strings.HasPrefix(scenario, "external-") {
+				if !strings.Contains(string(output), "runtime/bubble: channel belongs to another execution domain") {
+					t.Fatalf("missing runtime/bubble ownership diagnostic: %s", output)
+				}
 			}
 		})
 	}

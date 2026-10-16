@@ -10,16 +10,17 @@ import (
 	"unsafe"
 )
 
-// A synctestBubble is a set of goroutines started by synctest.Run.
+// A synctestBubble groups goroutines and a logical clock for testing/synctest
+// and host-controlled runtime/bubble execution.
 type synctestBubble struct {
 	deterministic *deterministicBubble // nil for ordinary testing/synctest bubbles
 	mu            mutex
 	timers        timers
 	id            uint64 // unique id
 	now           int64  // current fake time
-	root          *g     // caller of synctest.Run
+	root          *g     // caller of synctest.Run or current host controller
 	waiter        *g     // caller of synctest.Wait
-	main          *g     // goroutine started by synctest.Run
+	main          *g     // initial user goroutine
 	waiting       bool   // true if a goroutine is calling synctest.Wait
 	done          bool   // true if main has exited
 

@@ -1,3 +1,7 @@
+// Copyright 2026 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package bubble_test
 
 import (
@@ -8,7 +12,7 @@ import (
 const legacyStrict = "cooperative-v1"
 const legacyPrefix = "cooperative-v2-retirement"
 
-// Removed profiles must reject before their workflow can execute.
+// Unsupported protocols must be rejected before the initial function executes.
 func TestOldProfileReject(t *testing.T) {
 	for _, profile := range []string{legacyStrict, legacyPrefix} {
 		t.Run(profile, func(t *testing.T) {
