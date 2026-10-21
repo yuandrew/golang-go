@@ -106,12 +106,22 @@ func sync_runtime_SemacquireRWMutex(addr *uint32, lifo bool, skipframes int) {
 }
 
 //go:linkname sync_runtime_SemacquireWaitGroup sync.runtime_SemacquireWaitGroup
-func sync_runtime_SemacquireWaitGroup(addr *uint32, synctestDurable bool) {
+func sync_runtime_SemacquireWaitGroup(addr *uint32, synctestDurable bool, state *uint64, group unsafe.Pointer) {
 	reason := waitReasonSyncWaitGroupWait
 	if synctestDurable {
 		reason = waitReasonSynctestWaitGroupWait
 	}
+
+	gp := getg()
+	tracked := synctestDurable && gp.bubble != nil && gp.bubble.deterministic != nil
+	if tracked {
+		d := gp.bubble.deterministic
+		d.waitGroups = append(d.waitGroups, bubbleWaitGroup{gp: gp, group: group, state: state, sema: addr})
+	}
 	semacquire1(addr, false, semaBlockProfile, 0, reason)
+	if tracked {
+		gp.bubble.deterministic.removeWaitGroup(gp)
+	}
 }
 
 //go:linkname poll_runtime_Semrelease internal/poll.runtime_Semrelease
@@ -161,6 +171,13 @@ func semacquire1(addr *uint32, lifo bool, profile semaProfileFlags, skipframes i
 	//	sleep
 	//	(waiter descriptor is dequeued by signaler)
 	s := acquireSudog()
+	if reason == waitReasonSynctestWaitGroupWait && gp.bubble != nil && gp.bubble.deterministic != nil {
+		entry := gp.bubble.deterministic.waitGroupFor(gp)
+		if entry == nil {
+			throw("runtime/bubble: missing WaitGroup registration")
+		}
+		entry.waiter = s
+	}
 	root := semtable.rootFor(addr)
 	t0 := int64(0)
 	s.releasetime = 0
@@ -586,6 +603,9 @@ func notifyListAdd(l *notifyList) uint32 {
 //
 //go:linkname notifyListWait sync.runtime_notifyListWait
 func notifyListWait(l *notifyList, t uint32) {
+	if b := getg().bubble; b != nil && b.deterministic != nil {
+		panic(errorString("runtime/bubble: sync.Cond waits are not supported"))
+	}
 	lockWithRank(&l.lock, lockRankNotifyList)
 
 	// Return right away if this ticket has already been notified.

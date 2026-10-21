@@ -6,6 +6,7 @@ package sync
 
 import (
 	"internal/race"
+	runtimebubble "internal/runtime/bubble"
 	"internal/synctest"
 	"sync/atomic"
 	"unsafe"
@@ -83,12 +84,16 @@ func (wg *WaitGroup) Add(delta int) {
 		race.Disable()
 		defer race.Enable()
 	}
+	if wg.state.Load() == runtimebubble.DiscardedWaitGroupState {
+		panic("sync: WaitGroup used after bubble discard")
+	}
 	bubbled := false
 	if synctest.IsInBubble() {
 		// If Add is called from within a bubble, then all Add calls must be made
 		// from the same bubble.
 		switch synctest.Associate(wg) {
 		case synctest.Unbubbled:
+			waitGroupUnassociatedAdd()
 		case synctest.OtherBubble:
 			// wg is already associated with a different bubble.
 			fatal("sync: WaitGroup.Add called from multiple synctest bubbles")
@@ -161,8 +166,15 @@ func (wg *WaitGroup) Wait() {
 	if race.Enabled {
 		race.Disable()
 	}
+	if wg.state.Load() == runtimebubble.DiscardedWaitGroupState {
+		if race.Enabled {
+			race.Enable()
+		}
+		panic("sync: WaitGroup used after bubble discard")
+	}
 	for {
 		state := wg.state.Load()
+		waitGroupWaitCheck(unsafe.Pointer(wg), state)
 		v := int32(state >> 32)
 		w := uint32(state & 0x7fffffff)
 		if v == 0 {
@@ -203,7 +215,15 @@ func (wg *WaitGroup) Wait() {
 					race.Disable()
 				}
 			}
-			runtime_SemacquireWaitGroup(&wg.sema, synctestDurable)
+			// Pausing a replay bubble must publish this waiter's writes to its host.
+			replayRace := race.Enabled && synctestDurable && runtimebubble.IsBubbled()
+			if replayRace {
+				race.Enable()
+			}
+			runtime_SemacquireWaitGroup(&wg.sema, synctestDurable, (*uint64)(unsafe.Pointer(&wg.state)), unsafe.Pointer(wg))
+			if replayRace {
+				race.Disable()
+			}
 			isReset := wg.state.Load() != 0
 			if race.Enabled {
 				race.Enable()
@@ -258,3 +278,10 @@ func (wg *WaitGroup) Go(f func()) {
 		f()
 	}()
 }
+
+//go:noescape
+//go:linkname waitGroupWaitCheck
+func waitGroupWaitCheck(p unsafe.Pointer, state uint64)
+
+//go:linkname waitGroupUnassociatedAdd
+func waitGroupUnassociatedAdd()

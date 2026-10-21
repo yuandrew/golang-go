@@ -546,6 +546,7 @@ type g struct {
 	ditWanted       bool // set if g wants to be executed with DIT enabled
 	syncSafePoint   bool // set if g is stopped at a synchronous safe point.
 	runningCleanups atomic.Bool
+	bubbleSlot      uint16 // live-list index plus one; zero uses untracked/overflow fallback
 	sig             uint32
 	secret          int32 // current nesting of runtime/secret.Do calls.
 	writebuf        []byte
@@ -569,7 +570,7 @@ type g struct {
 	goroutineProfiled goroutineProfileStateHolder
 
 	coroarg *coro // argument during coroutine transfers
-	bubble  *synctestBubble
+	bubble  *goroutineBubble
 
 	// xRegs stores the extended register state if this G has been
 	// asynchronously preempted.
