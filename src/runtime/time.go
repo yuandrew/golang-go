@@ -421,9 +421,6 @@ func newTimer(when, period int64, f func(arg any, seq uintptr, delay int64), arg
 	if bubble := getg().bubble; bubble != nil {
 		t.isFake = true
 		if bubble.deterministic != nil {
-			if period != 0 {
-				panic(errorString("runtime/bubble: Ticker is unsupported"))
-			}
 			t.deterministicRegister(bubble)
 		}
 	}
@@ -580,9 +577,6 @@ func (t *timer) modify(when, period int64, f func(arg any, seq uintptr, delay in
 			// time.when saturates additions. At the endpoint it no longer
 			// distinguishes positive durations from immediately-ready timers.
 			panic(errorString("runtime/bubble: cannot schedule timers at the clock limit"))
-		}
-		if period != 0 {
-			panic(errorString("runtime/bubble: periodic timers are unsupported"))
 		}
 	}
 	if when <= 0 {
@@ -1458,6 +1452,7 @@ func (t *timer) maybeRunChan(c *hchan) {
 		fatal("synctest timer accessed from outside bubble")
 	}
 	if t.deterministic != nil {
+		t.deterministicPoll(c)
 		// Advancing the clock does not authorize a timer send. Only the
 		// host's FireTimer call can make this channel ready.
 		return

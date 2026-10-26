@@ -37,6 +37,13 @@ execution outside tests. It does not replace the ordinary scheduler or add synta
   timer firings. Advancing time alone is insufficient. IDs and generations
   distinguish current timers from canceled, reset or already delivered events.
   [Timer bookkeeping](src/runtime/bubble_time.go).
+- **Native tickers:** NewTicker, Tick, Stop and Reset use the same authorization
+  protocol. Each registration represents one send attempt. Direct handoff rearms
+  the next phase; a pending value pauses registration until channel access.
+  Slow receivers coalesce elapsed periods without changing a pending timestamp.
+  Polling never authorizes a send. Stop leaves the channel open; Reset starts a
+  new phase. No general callback-timer support is implied.
+  [Ticker polling and delivery](src/runtime/bubble_time.go).
 - **Application randomness:** package-level math/rand and math/rand/v2 share
   configured state owned by the bubble. That state is separate from select
   choices. Explicit generators retain their own sources.
@@ -58,8 +65,8 @@ execution outside tests. It does not replace the ordinary scheduler or add synta
   [Disposal](src/runtime/bubble.go), [Discard](src/runtime/bubble/bubble.go).
 - **Timer retirement acknowledgment:** the host acknowledges inactive ID ranges
   so detailed generation records can be removed. Acknowledged IDs remain obsolete;
-  resetting a retained native timer then assigns a new ID. Acknowledgments must
-  be reproduced during replay. Fragmented ranges can still grow.
+  resetting or rearming a retained native timer then assigns a new ID.
+  Acknowledgments must be reproduced during replay. Fragmented ranges can still grow.
   [Retirement](src/runtime/bubble_time.go).
 
 ## Private implementation choices
@@ -77,9 +84,12 @@ execution outside tests. It does not replace the ordinary scheduler or add synta
   ownership and records pending profiles before rewriting saved frames. Fault
   delivery waits for logical execution and runtime teardown to finish.
   [Stack coordination](src/runtime/bubble.go), [activity release](src/runtime/synctest.go).
-- **Inactive timer references:** Stop and authorization release strong timer
-  references while preserving stale-event validation. Collection still requires
-  all other references to become unreachable.
+- **Channel timer references:** host registrations hold weak native payloads,
+  allowing unreferenced channel timers and tickers to be collected. Scalar host
+  registrations remain until authorization, cancellation or disposal; GC does
+  not choose registration cleanup. Callback and Sleep timers remain strongly
+  retained until firing or cancellation. Stop and authorization retire stale
+  token state through the existing acknowledgment protocol.
   [Timer cleanup](src/runtime/bubble_time.go).
 - **Timer storage:** active registrations, sparse generation exceptions and
   merged acknowledgment ranges replace full records for obsolete timers.
@@ -100,7 +110,7 @@ execution outside tests. It does not replace the ordinary scheduler or add synta
 ## Exclusions and remaining limits
 
 External effects, persistence, history mapping and durable reconstruction belong
-to the host. General context, locks, tickers and reproducible map
+to the host. General context, locks and reproducible map
 traversal are not covered by the initial replay contract. Callback timers have
 compatibility code and tests, but are outside that contract.
 

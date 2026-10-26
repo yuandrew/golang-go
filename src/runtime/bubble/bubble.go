@@ -10,12 +10,13 @@
 // the host. Separate bubbles may run concurrently.
 //
 // The supported synchronization primitives are owned channels, select,
-// sync.WaitGroup, and runtime.Gosched. time.Now observes the logical clock. time.Sleep and positive
-// one-shot channel timers require explicit host timer authorization. Nonpositive
-// timers become ready locally.
+// sync.WaitGroup, and runtime.Gosched. time.Now observes the logical clock.
+// time.Sleep and positive channel timers, including time.NewTicker and time.Tick,
+// require explicit host timer authorization. Nonpositive timers become ready
+// locally.
 // This is not a memory sandbox: callers must avoid ambient I/O,
 // mutable state shared across concurrent execution domains, map-dependent
-// ordering, and other nondeterministic inputs. General sync, context, Ticker,
+// ordering, and other nondeterministic inputs. General sync, context,
 // and callback-timer support is outside the replay contract.
 // Explicit runtime.GC calls, iterator coroutine transfers, and sync.Cond waits
 // inside the bubble are rejected. Garbage collection initiated by the host is
@@ -27,6 +28,20 @@
 // behavior applies. Earlier expression effects are not rolled back. Sending,
 // receiving, closing, or selecting on a bubble-owned channel from ordinary Go
 // code or testing/synctest remains process-fatal.
+//
+// Each ticker registration authorizes one send attempt. A successful FireTimer
+// consumes that registration even when a slow receiver causes the send to drop.
+// A direct handoff rearms the next period. While an authorized tick remains
+// buffered, registrations pause until program code polls or receives from the
+// channel. Polling can rearm even if select chooses another case. It never sends
+// a new tick. Elapsed periods are coalesced, preserving the ticker's phase and
+// the timestamp of any pending value. Reset starts a new phase and drains pending
+// values. Stop drains pending values and leaves the channel open.
+//
+// Unreferenced channel timers may be collected independently of their host
+// registrations. Those registrations remain until authorization, cancellation,
+// or discard. Hosts remove consumed tokens, apply TimerChanges in order, then
+// acknowledge only IDs that are inactive at the resulting boundary.
 //
 // Package-level math/rand and math/rand/v2 calls share the bubble's application
 // random source. Options.RandomSource supplies a custom source; by default a
@@ -158,6 +173,7 @@ const (
 // TimerChange records a timer registration or cancellation in operation order.
 // Deadline is meaningful only for TimerArmed. Reset retains the ID and advances
 // Generation until the host acknowledges that ID; Reset then assigns a fresh ID.
+// Ticker rearming follows the same ID and generation rules.
 type TimerChange struct {
 	Kind       TimerChangeKind
 	ID         TimerID
@@ -177,7 +193,9 @@ type Delivery struct {
 	handle any
 }
 
-// FireTimer authorizes a timer generation at or after its deadline. It returns
+// FireTimer authorizes one timer firing attempt at or after its deadline. True
+// means the token was consumed, not that a value was received. A ticker may
+// publish a new registration in the resulting State. It returns
 // false for a known stale, canceled, or already authorized generation. Unknown
 // IDs, early authorization, and use outside the owning callback panic.
 // Acknowledged IDs ignore positive generations; zero generations remain invalid.

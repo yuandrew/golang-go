@@ -390,13 +390,13 @@ func (b *goroutineBubble) deterministicDispose() bool {
 		if reg == nil {
 			continue
 		}
-		if reg.timer != nil {
-			reg.timer.lock()
-			reg.timer.when = 0
-			reg.timer.unlock()
+		if t := reg.nativeTimer(); t != nil {
+			t.lock()
+			t.when = 0
+			t.unlock()
 		}
 		reg.armed = false
-		reg.timer = nil
+		reg.payload = nil
 	}
 	f := deterministicExit
 	fv := *(**funcval)(unsafe.Pointer(&f))

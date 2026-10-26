@@ -4,7 +4,11 @@
 
 package runtime
 
-import bubbleapi "internal/runtime/bubble"
+import (
+	"internal/runtime/atomic"
+	bubbleapi "internal/runtime/bubble"
+	"unsafe"
+)
 
 // deterministicTimer holds registration metadata only for host-controlled
 // timers. Its owner is immutable; the remaining fields are accessed only by
@@ -14,7 +18,10 @@ type deterministicTimer struct {
 	id         uint64
 	generation uint64
 	armed      bool
-	timer      *timer // strong only while awaiting host authorization
+	isChan     bool
+	// Channel payloads point to weak handles; other payloads point to native timers.
+	payload unsafe.Pointer
+	when    int64
 }
 
 // deterministicTimers is accessed only during exclusive bubble execution or
@@ -71,7 +78,7 @@ func (ts *deterministicTimers) newID() uint64 {
 //go:noinline
 func (t *timer) deterministicRegister(b *goroutineBubble) {
 	ts := &b.deterministic.timers
-	t.deterministic = &deterministicTimer{owner: b, id: ts.newID()}
+	t.deterministic = &deterministicTimer{owner: b, id: ts.newID(), isChan: t.isChan}
 }
 
 // Range acknowledgments preserve active gaps and merge adjacent history.
@@ -292,7 +299,7 @@ func (d *deterministicTimer) deterministicRetire() {
 	}
 	ts.setRetired(d.id, d.generation)
 	d.armed = false
-	d.timer = nil
+	d.payload = nil
 }
 
 func (t *timer) deterministicCheckOwner() {
@@ -310,17 +317,7 @@ func (t *timer) deterministicCheckOwner() {
 // deterministicDisarm records cancellation after the native timer operation
 // has released its locks. Appending may allocate and must run on a user stack.
 func (t *timer) deterministicDisarm() {
-	d := t.deterministic
-	if !d.armed {
-		return
-	}
-	ts := &d.owner.deterministic.timers
-	ts.changes = append(ts.changes, bubbleapi.TimerChange{
-		Kind:       deterministicTimerDisarmed,
-		ID:         d.id,
-		Generation: d.generation,
-	})
-	d.deterministicRetire()
+	t.deterministic.deterministicDisarmRecord()
 }
 
 // deterministicModified follows the ordinary modify path, including draining
@@ -328,9 +325,19 @@ func (t *timer) deterministicDisarm() {
 func (t *timer) deterministicModified(when int64) {
 	t.deterministicDisarm()
 	d := t.deterministic
+	b := d.owner
+	if when <= b.now {
+		d.nextGeneration()
+		d.deterministicRetire()
+		systemstack(func() { t.lock(); t.unlockAndRun(b.now, b) })
+		return
+	}
+	t.deterministicArm(when)
+}
+
+func (d *deterministicTimer) nextGeneration() {
 	ts := &d.owner.deterministic.timers
 	if ts.acknowledged(d.id) {
-		// Acknowledged IDs never become live again, even if Go code retains a timer.
 		d.id = ts.newID()
 		d.generation = unarmedGeneration
 	}
@@ -338,26 +345,43 @@ func (t *timer) deterministicModified(when int64) {
 	if d.generation == 0 {
 		throw("runtime/bubble: timer generation overflow")
 	}
-	b := d.owner
-	if when <= b.now {
-		d.deterministicRetire()
-		// Nonpositive timers are ready locally. Native delivery queues owned
-		// callback goroutines or channel receivers without host authorization.
-		systemstack(func() {
-			t.lock()
-			t.unlockAndRun(b.now, b)
-		})
+}
+
+func (t *timer) deterministicArm(when int64) {
+	d := t.deterministic
+	d.nextGeneration()
+	d.when = when
+	d.payload = unsafe.Pointer(t)
+	if t.isChan {
+		d.payload = unsafe.Pointer(getOrAddWeakHandle(unsafe.Pointer(t)))
+		KeepAlive(t)
+	}
+	d.armed = true
+	ts := &d.owner.deterministic.timers
+	ts.changes = append(ts.changes, bubbleapi.TimerChange{Kind: deterministicTimerArmed, ID: d.id, Generation: d.generation, Deadline: when})
+	ts.arm(d)
+}
+
+// A full ticker buffer needs no further sends until the program polls it.
+// Skip elapsed periods only while an older authorized value already fills it.
+func (t *timer) deterministicPoll(c *hchan) {
+	d := t.deterministic
+	if d.armed || t.period == 0 || t.when == 0 {
 		return
 	}
-	ts.changes = append(ts.changes, bubbleapi.TimerChange{
-		Kind:       deterministicTimerArmed,
-		ID:         d.id,
-		Generation: d.generation,
-		Deadline:   when,
-	})
-	d.armed = true
-	d.timer = t
-	ts.arm(d)
+	now := d.owner.now
+	if atomic.Loaduint(&c.qcount) != 0 && t.when <= now {
+		next := t.when + t.period*(1+(now-t.when)/t.period)
+		if next < 0 {
+			next = maxWhen
+		}
+		if next <= now {
+			t.when = 0
+			return
+		}
+		t.when = next
+	}
+	t.deterministicArm(t.when)
 }
 
 func (b *goroutineBubble) deterministicTimerChanges() []bubbleapi.TimerChange {
@@ -409,16 +433,50 @@ func (b *goroutineBubble) deterministicFireTimer(id, generation uint64) bool {
 	if d == nil || generation != d.generation || !d.armed {
 		return false
 	}
-	t := d.timer
-	if b.now < t.when {
+	if b.now < d.when {
 		panic(errorString("runtime/bubble: timer fired before its deadline"))
 	}
+	t := d.nativeTimer()
 	d.deterministicRetire()
-	// unlockAndRun computes delay from the scheduled deadline, preserving
-	// time.Timer.C's original timestamp even when the host fires it late.
-	systemstack(func() {
-		t.lock()
-		t.unlockAndRun(b.now, b)
-	})
+	if t != nil {
+		systemstack(func() { t.lock(); t.unlockAndRun(b.now, b) })
+		if t.period > 0 {
+			if t.when <= b.now {
+				t.when = 0
+			} else if atomic.Loaduint(&t.hchan().qcount) == 0 {
+				// A direct handoff leaves room for one more authorized tick.
+				t.deterministicArm(t.when)
+			}
+		}
+	}
 	return true
+}
+
+func (d *deterministicTimer) nativeTimer() *timer {
+	if d.payload == nil {
+		return nil
+	}
+	if d.isChan {
+		return (*timer)(internal_weak_runtime_makeStrongFromWeak(d.payload))
+	}
+	return (*timer)(d.payload)
+}
+
+func (d *deterministicTimer) deterministicDisarmRecord() {
+	if !d.armed {
+		return
+	}
+	ts := &d.owner.deterministic.timers
+	ts.changes = append(ts.changes, bubbleapi.TimerChange{Kind: deterministicTimerDisarmed, ID: d.id, Generation: d.generation})
+	d.deterministicRetire()
+}
+
+//go:linkname deterministicTickerResearchStats internal/runtime/bubble.TickerResearchStats
+func deterministicTickerResearchStats(handle any) [5]int {
+	b := handle.(*goroutineBubble)
+	if getg().bubble != nil || b.deterministic.stepping {
+		panic(errorString("runtime/bubble: inspection requires a paused host"))
+	}
+	ts := &b.deterministic.timers
+	return [5]int{len(ts.registered), cap(ts.registered), len(ts.retired), len(ts.ranges), int(unsafe.Sizeof(deterministicTimer{}))}
 }

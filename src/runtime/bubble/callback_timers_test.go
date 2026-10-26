@@ -15,21 +15,6 @@ import (
 // Callback-timer compatibility does not imply general context replay support.
 const callbackDelay = time.Second
 
-func TestTickerRejected(t *testing.T) {
-	var recovered any
-	b, _ := bubble.New(bubble.Options{}, func() {
-		defer func() { recovered = recover() }()
-		time.NewTicker(callbackDelay)
-	})
-	s, err := b.Step(bubble.Activation{})
-	if err != nil || recovered == nil || s.Status != bubble.Completed {
-		t.Fatalf("ticker: %+v %v panic=%v", s, err, recovered)
-	}
-	if err := b.Close(); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestAfterFuncBlockingCallback(t *testing.T) {
 	var trace []string
 	var gate chan struct{}

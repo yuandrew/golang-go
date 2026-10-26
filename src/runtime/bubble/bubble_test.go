@@ -781,13 +781,6 @@ func TestUnsupportedOperations(t *testing.T) {
 		}
 		return
 	}
-	t.Run("ticker", func(t *testing.T) {
-		b := newBubble(t, func() { time.NewTicker(time.Hour) })
-		state, err := b.Step(bubble.Activation{})
-		if err == nil || state.Status != bubble.Faulted {
-			t.Fatalf("unsupported ticker: state=%+v err=%v", state, err)
-		}
-	})
 	for _, scenario := range []string{"host-receive", "host-send", "host-close", "host-select", "host-reflect-select", "delivery-yield", "delivery-block"} {
 		t.Run(scenario, func(t *testing.T) {
 			cmd := exec.Command(os.Args[0], "-test.run=^TestUnsupportedOperations$", "-test.timeout=10s")
