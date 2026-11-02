@@ -520,6 +520,9 @@ type workType struct {
 // garbage collection is complete. It may also block the entire
 // program.
 func GC() {
+	if b := getg().bubble; b != nil && b.deterministic != nil {
+		panic(errorString("runtime/bubble: explicit GC is not supported"))
+	}
 	// We consider a cycle to be: sweep termination, mark, mark
 	// termination, and sweep. This function shouldn't return
 	// until a full cycle has been completed, from beginning to

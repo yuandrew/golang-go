@@ -10,17 +10,19 @@ import (
 	"unsafe"
 )
 
-// A synctestBubble is a set of goroutines started by synctest.Run.
-type synctestBubble struct {
-	mu      mutex
-	timers  timers
-	id      uint64 // unique id
-	now     int64  // current fake time
-	root    *g     // caller of synctest.Run
-	waiter  *g     // caller of synctest.Wait
-	main    *g     // goroutine started by synctest.Run
-	waiting bool   // true if a goroutine is calling synctest.Wait
-	done    bool   // true if main has exited
+// A goroutineBubble groups goroutines and a logical clock for testing/synctest
+// and host-controlled runtime/bubble execution.
+type goroutineBubble struct {
+	deterministic *deterministicBubble // nil for ordinary testing/synctest bubbles
+	mu            mutex
+	timers        timers
+	id            uint64 // unique id
+	now           int64  // current fake time
+	root          *g     // caller of synctest.Run or current host controller
+	waiter        *g     // caller of synctest.Wait
+	main          *g     // initial user goroutine
+	waiting       bool   // true if a goroutine is calling synctest.Wait
+	done          bool   // true if main has exited
 
 	// The bubble is active (not blocked) so long as running > 0 || active > 0.
 	//
@@ -40,7 +42,7 @@ type synctestBubble struct {
 
 // changegstatus is called when the non-lock status of a g changes.
 // It is never called with a Gscanstatus.
-func (bubble *synctestBubble) changegstatus(gp *g, oldval, newval uint32) {
+func (bubble *goroutineBubble) changegstatus(gp *g, oldval, newval uint32) {
 	// Determine whether this change in status affects the idleness of the bubble.
 	// If this isn't a goroutine starting, stopping, durably blocking,
 	// or waking up after durably blocking, then return immediately without
@@ -108,14 +110,14 @@ func (bubble *synctestBubble) changegstatus(gp *g, oldval, newval uint32) {
 
 // incActive increments the active-count for the bubble.
 // A bubble does not become durably blocked while the active-count is non-zero.
-func (bubble *synctestBubble) incActive() {
+func (bubble *goroutineBubble) incActive() {
 	lock(&bubble.mu)
 	bubble.active++
 	unlock(&bubble.mu)
 }
 
 // decActive decrements the active-count for the bubble.
-func (bubble *synctestBubble) decActive() {
+func (bubble *goroutineBubble) decActive() {
 	lock(&bubble.mu)
 	bubble.active--
 	if bubble.active < 0 {
@@ -125,12 +127,21 @@ func (bubble *synctestBubble) decActive() {
 	unlock(&bubble.mu)
 	if wake != nil {
 		goready(wake, 0)
+	} else if bubble.deterministic != nil {
+		bubble.deterministicFaultWake()
 	}
 }
 
 // maybeWakeLocked returns a g to wake if the bubble is durably blocked.
-func (bubble *synctestBubble) maybeWakeLocked() *g {
+func (bubble *goroutineBubble) maybeWakeLocked() *g {
 	if bubble.running > 0 || bubble.active > 0 {
+		return nil
+	}
+	if d := bubble.deterministic; d != nil {
+		if d.stepping && d.waiting {
+			d.waiting = false
+			return bubble.root
+		}
 		return nil
 	}
 	// Increment the bubble active count, since we've determined to wake something.
@@ -157,7 +168,7 @@ func (bubble *synctestBubble) maybeWakeLocked() *g {
 	return bubble.root
 }
 
-func (bubble *synctestBubble) raceaddr() unsafe.Pointer {
+func (bubble *goroutineBubble) raceaddr() unsafe.Pointer {
 	// Address used to record happens-before relationships created by the bubble.
 	//
 	// Wait creates a happens-before relationship between itself and
@@ -173,7 +184,7 @@ func synctestRun(f func()) {
 	if gp.bubble != nil {
 		panic("synctest.Run called from within a synctest bubble")
 	}
-	bubble := &synctestBubble{
+	bubble := &goroutineBubble{
 		id:      bubbleGen.Add(1),
 		total:   1,
 		running: 1,
@@ -255,7 +266,7 @@ func synctestRun(f func()) {
 
 type synctestDeadlockError struct {
 	reason string
-	bubble *synctestBubble
+	bubble *goroutineBubble
 }
 
 var _ error = synctestDeadlockError{}
@@ -282,6 +293,9 @@ func synctestWait() {
 	gp := getg()
 	if gp.bubble == nil {
 		panic("goroutine is not in a bubble")
+	}
+	if gp.bubble.deterministic != nil {
+		panic("synctest.Wait is not supported in runtime/bubble")
 	}
 	lock(&gp.bubble.mu)
 	// We use a bubble.waiting bool to detect simultaneous calls to Wait rather than
@@ -338,7 +352,7 @@ func synctest_acquire() any {
 
 //go:linkname synctest_release internal/synctest.release
 func synctest_release(bubble any) {
-	bubble.(*synctestBubble).decActive()
+	bubble.(*goroutineBubble).decActive()
 }
 
 //go:linkname synctest_inBubble internal/synctest.inBubble
@@ -347,7 +361,7 @@ func synctest_inBubble(bubble any, f func()) {
 	if gp.bubble != nil {
 		panic("goroutine is already bubbled")
 	}
-	gp.bubble = bubble.(*synctestBubble)
+	gp.bubble = bubble.(*goroutineBubble)
 	defer func() {
 		gp.bubble = nil
 	}()
@@ -359,6 +373,7 @@ type specialBubble struct {
 	_        sys.NotInHeap
 	special  special
 	bubbleid uint64
+	replay   bool
 }
 
 // Keep these in sync with internal/synctest.
@@ -412,6 +427,7 @@ func getOrSetBubbleSpecial(p unsafe.Pointer, bubbleid uint64, add bool) (assoc i
 		s := (*specialBubble)(mheap_.specialBubbleAlloc.alloc())
 		unlock(&mheap_.speciallock)
 		s.bubbleid = bubbleid
+		s.replay = getg().bubble.deterministic != nil
 		s.special.kind = _KindSpecialBubble
 		s.special.offset = offset
 		s.special.next = *iter

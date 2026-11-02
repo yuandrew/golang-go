@@ -14,7 +14,7 @@ import "unsafe"
 func runtime_Semacquire(s *uint32)
 
 // SemacquireWaitGroup is like Semacquire, but for WaitGroup.Wait.
-func runtime_SemacquireWaitGroup(s *uint32, synctestDurable bool)
+func runtime_SemacquireWaitGroup(s *uint32, synctestDurable bool, state *uint64, group unsafe.Pointer)
 
 // Semacquire(RW)Mutex(R) is like Semacquire, but for profiling contended
 // Mutexes and RWMutexes.

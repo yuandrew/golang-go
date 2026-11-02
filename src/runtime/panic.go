@@ -680,6 +680,12 @@ func deferreturn() {
 //
 // It crashes if called from a thread not created by the Go runtime.
 func Goexit() {
+	if b := getg().bubble; b != nil && b.deterministic != nil && b.deterministic.randomActive {
+		panic("runtime/bubble: random source must return")
+	}
+	if b := getg().bubble; b != nil && b.deterministic != nil && b.deterministic.delivering {
+		panic(errorString("runtime/bubble: delivery callback must return"))
+	}
 	// Create a panic object for Goexit, so we can recognize when it might be
 	// bypassed by a recover().
 	var p _panic
@@ -857,6 +863,23 @@ func gopanic(e any) {
 			break
 		}
 		fn()
+	}
+
+	if b := gp.bubble; b != nil && b.deterministic != nil && gp != b.root {
+		// User defers and recover keep ordinary semantics. An unrecovered
+		// bubble panic becomes a host fault without formatting user objects.
+		d := b.deterministic
+		if d.failure == "" {
+			d.failure = "user goroutine panic (non-string value)"
+			if message, ok := e.(string); ok {
+				const maxMessage = 256
+				if len(message) > maxMessage {
+					message = message[:maxMessage]
+				}
+				d.failure = "user goroutine panic: " + message
+			}
+		}
+		deterministicExit()
 	}
 
 	// If we're tracing, flush the current generation to make the trace more
@@ -1559,7 +1582,7 @@ func fatalpanic(msgs *_panic) {
 
 		// If this panic is the result of a synctest bubble deadlock,
 		// print stacks for the goroutines in the bubble.
-		var bubble *synctestBubble
+		var bubble *goroutineBubble
 		if de, ok := msgs.arg.(synctestDeadlockError); ok {
 			bubble = de.bubble
 		}
@@ -1647,7 +1670,7 @@ var deadlock mutex
 // gp is the crashing g running on this M, but may be a user G, while getg() is
 // always g0.
 // If bubble is non-nil, print the stacks for goroutines in this group as well.
-func dopanic_m(gp *g, pc, sp uintptr, bubble *synctestBubble) bool {
+func dopanic_m(gp *g, pc, sp uintptr, bubble *goroutineBubble) bool {
 	if gp.sig != 0 {
 		signame := signame(gp.sig)
 		if signame != "" {
