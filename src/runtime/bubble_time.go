@@ -317,7 +317,13 @@ func (t *timer) deterministicCheckOwner() {
 // deterministicDisarm records cancellation after the native timer operation
 // has released its locks. Appending may allocate and must run on a user stack.
 func (t *timer) deterministicDisarm() {
-	t.deterministic.deterministicDisarmRecord()
+	d := t.deterministic
+	if !d.armed {
+		return
+	}
+	ts := &d.owner.deterministic.timers
+	ts.changes = append(ts.changes, bubbleapi.TimerChange{Kind: deterministicTimerDisarmed, ID: d.id, Generation: d.generation})
+	d.deterministicRetire()
 }
 
 // deterministicModified follows the ordinary modify path, including draining
@@ -460,23 +466,4 @@ func (d *deterministicTimer) nativeTimer() *timer {
 		return (*timer)(internal_weak_runtime_makeStrongFromWeak(d.payload))
 	}
 	return (*timer)(d.payload)
-}
-
-func (d *deterministicTimer) deterministicDisarmRecord() {
-	if !d.armed {
-		return
-	}
-	ts := &d.owner.deterministic.timers
-	ts.changes = append(ts.changes, bubbleapi.TimerChange{Kind: deterministicTimerDisarmed, ID: d.id, Generation: d.generation})
-	d.deterministicRetire()
-}
-
-//go:linkname deterministicTickerResearchStats internal/runtime/bubble.TickerResearchStats
-func deterministicTickerResearchStats(handle any) [5]int {
-	b := handle.(*goroutineBubble)
-	if getg().bubble != nil || b.deterministic.stepping {
-		panic(errorString("runtime/bubble: inspection requires a paused host"))
-	}
-	ts := &b.deterministic.timers
-	return [5]int{len(ts.registered), cap(ts.registered), len(ts.retired), len(ts.ranges), int(unsafe.Sizeof(deterministicTimer{}))}
 }

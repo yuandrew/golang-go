@@ -63,8 +63,3 @@ func IsBubbled() bool
 
 // DiscardedWaitGroupState is an invalid counter with no registered waiters.
 const DiscardedWaitGroupState uint64 = 1<<63 | 0x80000000
-
-// Research-only inspection; not a proposed public API.
-//
-//go:linkname TickerResearchStats
-func TickerResearchStats(handle any) [5]int

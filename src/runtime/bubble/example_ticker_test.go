@@ -1,3 +1,7 @@
+// Copyright 2026 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package bubble_test
 
 import (
@@ -5,13 +9,12 @@ import (
 	"runtime/bubble"
 	"sort"
 	"sync"
-	"testing"
 	"time"
 )
 
-// ExampleTicker uses a generic host event queue to run two periodic polls.
+// ExampleBubble_ticker uses a generic host event queue to run two periodic polls.
 // TimerArmed entries are individual attempts, including rearmed tickers.
-func ExampleTicker() {
+func ExampleBubble_ticker() {
 	start := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
 	var samples [2][]time.Duration
 	b, err := bubble.New(bubble.Options{StartTime: start}, func() {
@@ -90,78 +93,4 @@ func ExampleTicker() {
 	// Output:
 	// fast [1s 2s 3s]
 	// slow [2s 4s 6s]
-}
-
-func TestTickerChannelGuarantees(t *testing.T) {
-	var gate chan bool
-	var ticker *time.Ticker
-	b, err := bubble.New(bubble.Options{}, func() {
-		gate = make(chan bool, 1)
-		ticker = time.NewTicker(time.Second)
-		<-gate
-		if len(ticker.C) != 0 || cap(ticker.C) != 0 {
-			panic("timer channel exposed its buffer")
-		}
-		ticker.Stop()
-		ticker.Stop()
-		select {
-		case _, ok := <-ticker.C:
-			if !ok {
-				panic("Stop closed channel")
-			}
-			panic("Stop left stale value")
-		default:
-		}
-		ticker.Reset(2 * time.Second)
-		tick := <-ticker.C
-		if !tick.Equal(time.Now()) {
-			panic("reset timestamp changed")
-		}
-		ticker.Stop()
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer b.Discard()
-	state, err := b.Step(bubble.Activation{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	old := state.TimerChanges[0]
-	state, err = b.Step(bubble.Activation{Now: old.Deadline, Deliver: func(d *bubble.Delivery) {
-		if !d.FireTimer(old.ID, old.Generation) {
-			panic("first rejected")
-		}
-	}})
-	if err != nil || len(state.TimerChanges) != 0 {
-		t.Fatalf("buffered %+v %v", state, err)
-	}
-	state, err = b.Step(bubble.Activation{Deliver: func(d *bubble.Delivery) { d.RetireTimerRange(old.ID, old.ID); gate <- true }})
-	if err != nil || len(state.TimerChanges) != 1 {
-		t.Fatalf("reset %+v %v", state, err)
-	}
-	fresh := state.TimerChanges[0]
-	if fresh.ID == old.ID {
-		t.Fatal("acknowledged ID reused")
-	}
-	state, err = b.Step(bubble.Activation{Now: fresh.Deadline, Deliver: func(d *bubble.Delivery) {
-		if d.FireTimer(old.ID, old.Generation) {
-			panic("stale accepted")
-		}
-		if !d.FireTimer(fresh.ID, fresh.Generation) {
-			panic("reset rejected")
-		}
-	}})
-	if err != nil || state.Status != bubble.Completed {
-		t.Fatalf("final %+v %v", state, err)
-	}
-}
-
-func BenchmarkOrdinaryTimerResetStop(b *testing.B) {
-	b.ReportAllocs()
-	for range b.N {
-		timer := time.NewTimer(time.Hour)
-		timer.Reset(2 * time.Hour)
-		timer.Stop()
-	}
 }

@@ -1,3 +1,7 @@
+// Copyright 2026 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package bubble_test
 
 import (
@@ -6,8 +10,7 @@ import (
 	"time"
 )
 
-// A steady period is one authorization, delivery and next registration.
-// Timer is the existing one-shot capability, not a substitute correctness test.
+// Compare steady periodic delivery using a reset Timer and a Ticker.
 func BenchmarkBubblePeriodic(b *testing.B) {
 	for _, mode := range []string{"Timer", "Ticker"} {
 		b.Run(mode, func(b *testing.B) {
@@ -59,5 +62,41 @@ func BenchmarkBubblePeriodic(b *testing.B) {
 				b.Fatalf("delivered %d, want %d", delivered, b.N)
 			}
 		})
+	}
+}
+
+func BenchmarkBubbleTickerLifecycle(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		bb, err := bubble.New(bubble.Options{}, func() {
+			ticker := time.NewTicker(time.Second)
+			<-ticker.C
+			ticker.Stop()
+		})
+		if err != nil {
+			b.Fatal(err)
+		}
+		s, err := bb.Step(bubble.Activation{})
+		if err != nil {
+			b.Fatal(err)
+		}
+		c := s.TimerChanges[0]
+		s, err = bb.Step(bubble.Activation{Now: c.Deadline, Deliver: func(d *bubble.Delivery) {
+			d.FireTimer(c.ID, c.Generation)
+		}})
+		if err != nil || s.Status != bubble.Completed {
+			b.Fatalf("%+v %v", s, err)
+		}
+		if err := bb.Close(); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkOrdinaryTimerResetStop(b *testing.B) {
+	b.ReportAllocs()
+	for range b.N {
+		timer := time.NewTimer(time.Hour)
+		timer.Reset(2 * time.Hour)
+		timer.Stop()
 	}
 }

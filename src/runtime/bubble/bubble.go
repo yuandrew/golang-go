@@ -6,8 +6,8 @@
 //
 // Descendants inherit their bubble through ordinary go statements. Each bubble
 // runs one user goroutine at a time and has an independent logical clock.
-// Step runs until every remaining user goroutine is blocked, then returns to
-// the host. Separate bubbles may run concurrently.
+// Step returns to the host when execution becomes quiescent, completes, or
+// faults. Separate bubbles may run concurrently.
 //
 // The supported synchronization primitives are owned channels, select,
 // sync.WaitGroup, and runtime.Gosched. time.Now observes the logical clock.
@@ -51,7 +51,7 @@
 //
 // A WaitGroup must start its active use inside its owning bubble. Add, Done,
 // Wait, and Go must stay in that domain until all Wait calls have returned.
-// A package-level WaitGroup value cannot be associated in this prototype; a
+// A package-level WaitGroup value cannot be associated with a bubble; a
 // heap-allocated group referenced by a package-level pointer can be owned.
 //
 // An unrecovered user goroutine panic faults the bubble after normal defer

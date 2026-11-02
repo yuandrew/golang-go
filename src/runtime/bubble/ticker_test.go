@@ -1,26 +1,27 @@
+// Copyright 2026 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package bubble_test
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
 	"runtime"
 	"runtime/bubble"
+	"slices"
 	"sort"
 	"testing"
 	"time"
 	"weak"
 )
 
-func TestResearchTicker(t *testing.T) {
-	seed := uint64(0)
-	fmt.Sscan(os.Getenv("TICKER_SEED"), &seed)
+func TestTickerScheduling(t *testing.T) {
 	var ticks []int64
 	var gate chan string
 	var ticker *time.Ticker
 	var stoppedClosed, pending bool
 	start := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
-	b, _ := bubble.New(bubble.Options{StartTime: start, Seed: seed}, func() {
+	b, _ := bubble.New(bubble.Options{StartTime: start}, func() {
 		gate = make(chan string, 1)
 		ticker = time.NewTicker(time.Second)
 		defer func() { panic("discard ran defer") }()
@@ -141,14 +142,30 @@ func TestResearchTicker(t *testing.T) {
 		}
 		gate <- "read"
 	})
-	fmt.Println("SEMANTICS", ticks, c, stoppedClosed, pending)
 }
 
-// A general periodic sensor simulation. Inputs are ordered host authorizations.
-func TestResearchReplay(t *testing.T) {
-	var seed uint64
-	fmt.Sscan(os.Getenv("TICKER_SEED"), &seed)
-	changed := os.Getenv("TICKER_CHANGED") != ""
+func TestTickerReplay(t *testing.T) {
+	originalProcs := runtime.GOMAXPROCS(0)
+	defer runtime.GOMAXPROCS(originalProcs)
+	for _, seed := range []uint64{0, 17} {
+		t.Run(fmt.Sprintf("seed=%d", seed), func(t *testing.T) {
+			runtime.GOMAXPROCS(1)
+			want := tickerReplay(t, seed, false)
+			for _, procs := range []int{1, 4} {
+				runtime.GOMAXPROCS(procs)
+				if got := tickerReplay(t, seed, false); !slices.Equal(got, want) {
+					t.Fatalf("GOMAXPROCS=%d: replay changed\nwant %q\n got %q", procs, want, got)
+				}
+			}
+			if slices.Equal(tickerReplay(t, seed, true), want) {
+				t.Fatal("replay missed an omitted timer firing")
+			}
+		})
+	}
+}
+
+func tickerReplay(t *testing.T, seed uint64, omitFirst bool) []string {
+	t.Helper()
 	start := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
 	var trace []string
 	var gate chan bool
@@ -208,7 +225,7 @@ func TestResearchReplay(t *testing.T) {
 				if c.Kind != bubble.TimerArmed {
 					continue
 				}
-				if changed && round == 1 && i == 0 {
+				if omitFirst && round == 1 && i == 0 {
 					continue
 				}
 				if !d.FireTimer(c.ID, c.Generation) {
@@ -223,11 +240,10 @@ func TestResearchReplay(t *testing.T) {
 		boundaries = append(boundaries, fmt.Sprintf("%d/%d/%v/%v", s.Status, s.LiveGoroutines, trace, s.TimerChanges))
 		update(s.TimerChanges)
 	}
-	data, _ := json.Marshal(boundaries)
-	fmt.Println("TRANSCRIPT", string(data))
+	return boundaries
 }
 
-func TestResearchTickerFaultDiscard(t *testing.T) {
+func TestTickerFaultDiscard(t *testing.T) {
 	for _, kind := range []string{"early", "future", "zero", "unknown", "retire-active", "user", "pending", "blocked"} {
 		t.Run(kind, func(t *testing.T) {
 			var ran, defers int
@@ -299,7 +315,7 @@ func TestResearchTickerFaultDiscard(t *testing.T) {
 	}
 }
 
-func TestResearchTickerResetPending(t *testing.T) {
+func TestTickerResetPending(t *testing.T) {
 	var gate chan bool
 	var got time.Time
 	b, _ := bubble.New(bubble.Options{}, func() {
@@ -346,7 +362,7 @@ func TestResearchTickerResetPending(t *testing.T) {
 	}
 }
 
-func TestResearchTickerCycles(t *testing.T) {
+func TestTickerStopResetDiscard(t *testing.T) {
 	var refs []weak.Pointer[time.Ticker]
 	for i := 0; i < 200; i++ {
 		var gate chan bool
@@ -371,7 +387,7 @@ func TestResearchTickerCycles(t *testing.T) {
 			t.Fatal(e)
 		}
 	}
-	researchHeap()
+	collectTickerGarbage()
 	for _, ref := range refs {
 		if ref.Value() != nil {
 			t.Fatal("ticker retained after repeated reset/stop/discard")
@@ -379,95 +395,35 @@ func TestResearchTickerCycles(t *testing.T) {
 	}
 }
 
-func researchHeap() runtime.MemStats {
+func collectTickerGarbage() {
 	runtime.GC()
 	runtime.GC()
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-	return m
 }
 
-func TestResearchTickerRetention(t *testing.T) {
-	for _, stop := range []bool{false, true} {
-		for _, n := range []int{4000, 16000} {
-			before := researchHeap()
-			b, _ := bubble.New(bubble.Options{}, func() {
-				for i := 0; i < n; i++ {
-					tk := time.NewTicker(time.Hour)
-					if stop {
-						tk.Stop()
-					}
-				}
-				select {}
-			})
-			s, e := b.Step(bubble.Activation{})
-			if e != nil {
-				t.Fatal(e)
-			}
-			s.TimerChanges = nil
-			held := researchHeap()
-			if e = b.Discard(); e != nil {
-				t.Fatal(e)
-			}
-			after := researchHeap()
-			t.Logf("stop=%v n=%d heldBytes=%d heldObjects=%d afterDiscardBytes=%d allocatedBytes=%d allocations=%d", stop, n, int64(held.HeapAlloc)-int64(before.HeapAlloc), int64(held.HeapObjects)-int64(before.HeapObjects), int64(after.HeapAlloc)-int64(before.HeapAlloc), held.TotalAlloc-before.TotalAlloc, held.Mallocs-before.Mallocs)
-			runtime.KeepAlive(b)
-		}
-	}
-}
-
-// Preserve CPU fixtures for a serialized run. No CPU measurements in this investigation.
-func BenchmarkResearchTicker(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		bb, _ := bubble.New(bubble.Options{}, func() { tk := time.NewTicker(time.Second); <-tk.C; tk.Stop() })
-		s, e := bb.Step(bubble.Activation{})
-		if e != nil {
-			b.Fatal(e)
-		}
-		c := s.TimerChanges[0]
-		if _, e = bb.Step(bubble.Activation{Now: c.Deadline, Deliver: func(d *bubble.Delivery) { d.FireTimer(c.ID, c.Generation) }}); e != nil {
-			b.Fatal(e)
-		}
-		bb.Close()
-	}
-}
-
-func TestResearchOrdinaryTickerRetention(t *testing.T) {
-	for _, n := range []int{4000, 16000} {
-		before := researchHeap()
-		for i := 0; i < n; i++ {
-			time.NewTicker(time.Hour)
-		}
-		after := researchHeap()
-		t.Logf("ordinary n=%d retainedBytes=%d retainedObjects=%d", n, int64(after.HeapAlloc)-int64(before.HeapAlloc), int64(after.HeapObjects)-int64(before.HeapObjects))
-	}
-}
-
-func TestResearchTickerWeakReachability(t *testing.T) {
+func TestTickerCollection(t *testing.T) {
 	var ordinary, owned weak.Pointer[time.Ticker]
 	ordinary = weak.Make(time.NewTicker(time.Hour))
 	b, _ := bubble.New(bubble.Options{}, func() { owned = weak.Make(time.NewTicker(time.Hour)); select {} })
 	if _, e := b.Step(bubble.Activation{}); e != nil {
 		t.Fatal(e)
 	}
-	researchHeap()
+	collectTickerGarbage()
 	if ordinary.Value() != nil {
 		t.Fatal("ordinary ticker unexpectedly retained")
 	}
 	if owned.Value() != nil {
-		t.Fatal("weak candidate retained unreachable ticker")
+		t.Fatal("bubble retained unreachable ticker")
 	}
 	if e := b.Discard(); e != nil {
 		t.Fatal(e)
 	}
-	researchHeap()
+	collectTickerGarbage()
 	if owned.Value() != nil {
 		t.Fatal("discard retained ticker")
 	}
-	t.Log("ordinary and candidate collected while paused; discard remains valid")
 }
 
-func TestResearchTickerEndpoint(t *testing.T) {
+func TestTickerClockLimit(t *testing.T) {
 	start := time.Unix(0, 1<<63-1-int64(time.Second))
 	var got time.Time
 	b, _ := bubble.New(bubble.Options{StartTime: start}, func() { tk := time.NewTicker(time.Second); got = <-tk.C; tk.Stop() })
@@ -491,31 +447,7 @@ func TestResearchTickerEndpoint(t *testing.T) {
 	}
 }
 
-func TestResearchTickerAllocations(t *testing.T) {
-	var tk *time.Ticker
-	b, _ := bubble.New(bubble.Options{}, func() {
-		tk = time.NewTicker(time.Second)
-		for {
-			<-tk.C
-		}
-	})
-	defer b.Discard()
-	s, e := b.Step(bubble.Activation{})
-	if e != nil {
-		t.Fatal(e)
-	}
-	c := s.TimerChanges[0]
-	allocs := testing.AllocsPerRun(100, func() {
-		s, e = b.Step(bubble.Activation{Now: c.Deadline, Deliver: func(d *bubble.Delivery) { d.FireTimer(c.ID, c.Generation) }})
-		if e != nil {
-			t.Fatal(e)
-		}
-		c = s.TimerChanges[0]
-	})
-	t.Logf("allocations per timely ticker activation: %.0f", allocs)
-}
-
-func TestResearchTickInvalidDurations(t *testing.T) {
+func TestTickInvalidDurations(t *testing.T) {
 	b, _ := bubble.New(bubble.Options{}, func() {
 		if time.Tick(0) != nil || time.Tick(-1) != nil {
 			panic("invalid Tick")
@@ -535,5 +467,70 @@ func TestResearchTickInvalidDurations(t *testing.T) {
 	s, e := b.Step(bubble.Activation{})
 	if e != nil || s.Status != bubble.Completed || len(s.TimerChanges) != 0 {
 		t.Fatalf("%v %v", s, e)
+	}
+}
+
+func TestTickerChannelGuarantees(t *testing.T) {
+	var gate chan bool
+	var ticker *time.Ticker
+	b, err := bubble.New(bubble.Options{}, func() {
+		gate = make(chan bool, 1)
+		ticker = time.NewTicker(time.Second)
+		<-gate
+		if len(ticker.C) != 0 || cap(ticker.C) != 0 {
+			panic("timer channel exposed its buffer")
+		}
+		ticker.Stop()
+		ticker.Stop()
+		select {
+		case _, ok := <-ticker.C:
+			if !ok {
+				panic("Stop closed channel")
+			}
+			panic("Stop left stale value")
+		default:
+		}
+		ticker.Reset(2 * time.Second)
+		tick := <-ticker.C
+		if !tick.Equal(time.Now()) {
+			panic("reset timestamp changed")
+		}
+		ticker.Stop()
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer b.Discard()
+	state, err := b.Step(bubble.Activation{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := state.TimerChanges[0]
+	state, err = b.Step(bubble.Activation{Now: old.Deadline, Deliver: func(d *bubble.Delivery) {
+		if !d.FireTimer(old.ID, old.Generation) {
+			panic("first rejected")
+		}
+	}})
+	if err != nil || len(state.TimerChanges) != 0 {
+		t.Fatalf("buffered %+v %v", state, err)
+	}
+	state, err = b.Step(bubble.Activation{Deliver: func(d *bubble.Delivery) { d.RetireTimerRange(old.ID, old.ID); gate <- true }})
+	if err != nil || len(state.TimerChanges) != 1 {
+		t.Fatalf("reset %+v %v", state, err)
+	}
+	fresh := state.TimerChanges[0]
+	if fresh.ID == old.ID {
+		t.Fatal("acknowledged ID reused")
+	}
+	state, err = b.Step(bubble.Activation{Now: fresh.Deadline, Deliver: func(d *bubble.Delivery) {
+		if d.FireTimer(old.ID, old.Generation) {
+			panic("stale accepted")
+		}
+		if !d.FireTimer(fresh.ID, fresh.Generation) {
+			panic("reset rejected")
+		}
+	}})
+	if err != nil || state.Status != bubble.Completed {
+		t.Fatalf("final %+v %v", state, err)
 	}
 }

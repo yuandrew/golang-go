@@ -47,3 +47,8 @@ func BubbleUnlinkQueues(send, recv, remove []int) (sendLeft, recvLeft []int) {
 	}
 	return remaining(&c.sendq), remaining(&c.recvq)
 }
+
+func BubbleTimerRegistry(handle any) (registered, retired, ranges int) {
+	ts := &handle.(*goroutineBubble).deterministic.timers
+	return len(ts.registered), len(ts.retired), len(ts.ranges)
+}

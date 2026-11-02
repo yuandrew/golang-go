@@ -299,7 +299,8 @@ func TestIndependentClocks(t *testing.T) {
 func TestConcurrentIndependentBubbles(t *testing.T) {
 	const n = 8
 	var wg sync.WaitGroup
-	errs := make(chan error, n)
+	// Each worker may report both a Step error and a Close error.
+	errs := make(chan error, 2*n)
 	for i := 0; i < n; i++ {
 		wg.Add(1)
 		go func() {
