@@ -103,6 +103,13 @@ func (root *semaRoot) bubbleWaitHead(addr *uint32) *sudog {
 
 func (b *goroutineBubble) preflightWaitGroups() bool {
 	d := b.deterministic
+	// Build the index before taking shared semaphore locks.
+	records := make(map[*g]*bubbleWaitGroup, len(d.waitGroups))
+	for i := range d.waitGroups {
+		entry := &d.waitGroups[i]
+		records[entry.gp] = entry
+	}
+
 	for i, entry := range d.waitGroups {
 		first := true
 		for j := 0; j < i; j++ {
@@ -144,7 +151,7 @@ func (b *goroutineBubble) preflightWaitGroups() bool {
 		seen := 0
 		valid := true
 		for s := root.bubbleWaitHead(entry.sema); s != nil; s = s.waitlink {
-			registered := d.waitGroupFor(s.g)
+			registered := records[s.g]
 			if s.g.bubble != b || registered == nil || registered.sema != entry.sema || registered.waiter != s {
 				valid = false
 				break

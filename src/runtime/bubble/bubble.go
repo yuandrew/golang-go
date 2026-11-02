@@ -21,6 +21,13 @@
 // inside the bubble are rejected. Garbage collection initiated by the host is
 // allowed.
 //
+// Inside a bubble, sending, receiving, closing, selecting on, or taking the
+// length or capacity of a non-nil channel owned by another execution domain
+// panics before that channel operation takes effect. Ordinary defer and recover
+// behavior applies. Earlier expression effects are not rolled back. Sending,
+// receiving, closing, or selecting on a bubble-owned channel from ordinary Go
+// code or testing/synctest remains process-fatal.
+//
 // Package-level math/rand and math/rand/v2 calls share the bubble's application
 // random source. Options.RandomSource supplies a custom source; by default a
 // fresh PCG is seeded with (Options.Seed, 0). Application randomness is separate

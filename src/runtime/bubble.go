@@ -181,7 +181,7 @@ func deterministicCheckChan(c *hchan) {
 	}
 	b := getg().bubble
 	if b != nil && b.deterministic != nil && c.bubble != b {
-		fatal(deterministicChannelAccessError)
+		panic(deterministicChannelAccessError)
 	}
 }
 

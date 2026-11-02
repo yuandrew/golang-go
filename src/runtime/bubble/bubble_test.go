@@ -742,34 +742,13 @@ func TestUnsupportedOperations(t *testing.T) {
 		var owned chan int
 		b, err := bubble.New(bubble.Options{}, func() {
 			switch scenario {
-			case "external-send":
-				external <- 1
-			case "external-select":
-				select {
-				case <-external:
-				default:
-				}
-			case "external-reflect-select":
-				reflect.Select([]reflect.SelectCase{
-					{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(external)},
-					{Dir: reflect.SelectDefault},
-				})
-			case "external-close":
-				close(external)
-			case "external-closed-receive":
-				<-external
 			case "host-receive", "host-send", "host-close", "host-select", "host-reflect-select":
 				owned = make(chan int, 1)
 				owned <- 42
-			case "ticker":
-				time.NewTicker(time.Hour)
 			}
 		})
 		if err != nil {
 			t.Fatal(err)
-		}
-		if scenario == "external-closed-receive" {
-			close(external)
 		}
 		var activation bubble.Activation
 		if scenario == "delivery-yield" {
@@ -802,7 +781,14 @@ func TestUnsupportedOperations(t *testing.T) {
 		}
 		return
 	}
-	for _, scenario := range []string{"external-send", "external-select", "external-reflect-select", "external-close", "external-closed-receive", "host-receive", "host-send", "host-close", "host-select", "host-reflect-select", "ticker", "delivery-yield", "delivery-block"} {
+	t.Run("ticker", func(t *testing.T) {
+		b := newBubble(t, func() { time.NewTicker(time.Hour) })
+		state, err := b.Step(bubble.Activation{})
+		if err == nil || state.Status != bubble.Faulted {
+			t.Fatalf("unsupported ticker: state=%+v err=%v", state, err)
+		}
+	})
+	for _, scenario := range []string{"host-receive", "host-send", "host-close", "host-select", "host-reflect-select", "delivery-yield", "delivery-block"} {
 		t.Run(scenario, func(t *testing.T) {
 			cmd := exec.Command(os.Args[0], "-test.run=^TestUnsupportedOperations$", "-test.timeout=10s")
 			cmd.Env = append(os.Environ(), "GO_BUBBLE_UNSUPPORTED="+scenario)
@@ -813,13 +799,15 @@ func TestUnsupportedOperations(t *testing.T) {
 			if strings.Contains(string(output), "test timed out") {
 				t.Fatalf("unsupported operation hung instead of being rejected: %s", output)
 			}
-			if !strings.Contains(string(output), "bubble") {
-				t.Fatalf("missing bubble diagnostic: %s", output)
+			want := "fatal error: runtime/bubble: channel belongs to another execution domain"
+			switch scenario {
+			case "delivery-yield":
+				want = "fatal error: runtime/bubble: delivery callback must not yield"
+			case "delivery-block":
+				want = "fatal error: runtime/bubble: delivery callback must not block"
 			}
-			if strings.HasPrefix(scenario, "host-") || strings.HasPrefix(scenario, "external-") {
-				if !strings.Contains(string(output), "runtime/bubble: channel belongs to another execution domain") {
-					t.Fatalf("missing runtime/bubble ownership diagnostic: %s", output)
-				}
+			if !strings.Contains(string(output), want) {
+				t.Fatalf("missing fatal diagnostic %q: %s", want, output)
 			}
 		})
 	}

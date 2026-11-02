@@ -22,6 +22,13 @@ execution outside tests. It does not replace the ordinary scheduler or add synta
   blocking, explicit yield and exit advance logical turns. Physical preemption
   does not choose the next turn. Ready select choices use a seeded stream.
   [Scheduler](src/runtime/bubble.go), [select](src/runtime/select.go).
+- **Channel ownership:** inside a deterministic bubble, send, receive, close,
+  select, len and cap reject non-nil foreign channels with a panic before the
+  forbidden operation takes effect. User code may recover and continue; an
+  escaping panic faults the bubble. Earlier expression effects are not rolled
+  back. Host send, receive, close and select on an owned channel remain
+  process-fatal.
+  [Channel checks](src/runtime/bubble.go).
 - **Ordered delivery:** Deliver applies host inputs before user goroutines
   resume. The controller temporarily joins the bubble. Its callback must not
   block or yield. Delivery is not a transaction; mutations are not rolled back.
@@ -61,6 +68,11 @@ execution outside tests. It does not replace the ordinary scheduler or add synta
   of scanning the process-wide list for disposal. A small index accelerates
   removal; larger executions use a search fallback without a concurrency cap.
   [Membership and disposal](src/runtime/bubble.go), [spawn and exit](src/runtime/proc.go).
+- **WaitGroup preflight index:** discard builds a temporary waiter index before
+  taking shared semaphore locks. Queue validation uses it instead of repeatedly
+  searching the registry under those locks. The index adds temporary storage
+  proportional to outstanding waits and does not change ordinary operations.
+  [WaitGroup cleanup](src/runtime/bubble_waitgroup.go).
 - **Stack and profiling coordination:** disposal acquires per-stack scan
   ownership and records pending profiles before rewriting saved frames. Fault
   delivery waits for logical execution and runtime teardown to finish.
@@ -92,9 +104,10 @@ to the host. General context, locks, tickers and reproducible map
 traversal are not covered by the initial replay contract. Callback timers have
 compatibility code and tests, but are outside that contract.
 
-WaitGroup disposal uses linear registry searches and can take quadratic time,
-including scans under a shared semaphore lock. The lookup-table optimization is
-not part of this prototype.
+WaitGroup disposal still has quadratic worst-case work in member lookup, group
+validation and normal-return registry maintenance. Temporary indexing removes
+repeated registry searches under the shared semaphore lock, but validating and
+removing a large queue can still delay unrelated operations sharing that lock.
 
 Replay across arbitrary future Go versions, bounded total heap use and bounded
 discard latency are not established. A passing test demonstrates the tested
